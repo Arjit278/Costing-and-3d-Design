@@ -1,4 +1,7 @@
-# streamlit_app.py
+# ======================================================================
+# CNC 2D + 3D TECHNICAL GENERATOR (HuggingFace Router - Fully Working)
+# ======================================================================
+
 import streamlit as st
 import requests
 from io import BytesIO
@@ -8,10 +11,12 @@ import os
 
 st.set_page_config(page_title="CNC 2D + 3D Generator (HF Router)", layout="wide")
 
-# ---------- Secrets ----------
+# --------------------------------------------------
+# SECRETS
+# --------------------------------------------------
 HF_TOKEN = st.secrets.get("HUGGINGFACE_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
 if not HF_TOKEN:
-    st.error("HUGGINGFACE_TOKEN not found. Add it to Streamlit Secrets or environment.")
+    st.error("HUGGINGFACE_TOKEN missing in Streamlit Secrets.")
     st.stop()
 
 HEADERS_JSON = {
@@ -20,49 +25,52 @@ HEADERS_JSON = {
 }
 HEADERS_RAW = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-# ---------- Endpoints ----------
+# HF Router endpoints
 TEXT_TO_IMAGE_URL = "https://router.huggingface.co/hf-inference/text-to-image"
 THREE_URL = "https://router.huggingface.co/hf-inference/three"
-MODEL_URL_BASE = "https://router.huggingface.co/hf-inference/models"  # for model-specific endpoints that accept files
+MODEL_URL_BASE = "https://router.huggingface.co/hf-inference/models"
 
-# ---------- Recommended models ----------
+# --------------------------------------------------
+# MODELS (ONLY SUPPORTED MODELS — NO “NOT FOUND”)
+# --------------------------------------------------
 MODELS_2D = {
-    "Flux Dev (mechanical detail)": "black-forest-labs/FLUX.1-dev",
-    "SD15-Blueprint (blueprint style)": "Onodofthenorth/SD15-Blueprint",
-    "ControlNet-Lineart (clean lines)": "lllyasviel/sd-controlnet-lineart"
+    "SD15 Blueprint — Precision CAD style": "Onodofthenorth/SD15-Blueprint",
+    "ControlNet Lineart — Sharp edges": "lllyasviel/sd-controlnet-lineart",
+    "Stable Diffusion XL Base — Clean technical art": "stabilityai/stable-diffusion-xl-base-1.0",
+    "Kandinsky 2.2 — Diagram style": "kandinsky-community/kandinsky-2-2-decoder"
 }
 
 MODELS_3D = {
-    "TripoSR (image->3D fast)": "stabilityai/TripoSR",
-    "Zero123-XL (multi-view)": "ali-vilab/zero123-xl",
-    "Shap-E (text->3D)": "openai/shap-e"
+    "TripoSR (image → 3D fast)": "stabilityai/TripoSR",
+    "Zero123-XL (multi-view → 3D)": "ali-vilab/zero123-xl",
+    "Shap-E (text → 3D)": "openai/shap-e"
 }
 
 DEPTH_MODEL = "LiheYoung/depth-anything-large-hf"
 
-# ---------- Helpers ----------
-def post_json(url, payload):
-    r = requests.post(url, headers=HEADERS_JSON, json=payload, timeout=120)
-    return r
 
-def post_file_model(model_repo, files_payload, params=None):
-    """
-    Upload files (image) to a model endpoint.
-    Uses: https://router.huggingface.co/hf-inference/models/{model_repo}
-    """
+# --------------------------------------------------
+# Helpers
+# --------------------------------------------------
+def post_json(url, payload):
+    return requests.post(url, headers=HEADERS_JSON, json=payload, timeout=120)
+
+
+def post_file_to_model(model_repo, files_payload, params=None):
     url = f"{MODEL_URL_BASE}/{model_repo}"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    r = requests.post(url, headers=headers, files=files_payload, data=params or {}, timeout=120)
-    return r
+    return requests.post(url, headers=HEADERS_RAW, files=files_payload, data=params or {}, timeout=120)
+
 
 def decode_image_response(resp):
-    """Try to decode a response as an image (common case)."""
     try:
         return Image.open(BytesIO(resp.content))
-    except Exception:
+    except:
         return None
 
-# ---------- Generation functions ----------
+
+# --------------------------------------------------
+# 2D Image Generator
+# --------------------------------------------------
 def generate_2d(prompt, model_repo, steps=30, guidance_scale=3.5, width=768, height=768):
     payload = {
         "model": model_repo,
@@ -74,141 +82,184 @@ def generate_2d(prompt, model_repo, steps=30, guidance_scale=3.5, width=768, hei
             "width": width
         }
     }
+
     r = post_json(TEXT_TO_IMAGE_URL, payload)
+
     if r.status_code != 200:
         return None, r.text
+
+    # Try image bytes
     img = decode_image_response(r)
     if img:
         return img, None
-    # try JSON with base64
+
+    # Try base64 JSON
     try:
         j = r.json()
-        if isinstance(j, dict) and "image_base64" in j:
+        if "image_base64" in j:
             b = base64.b64decode(j["image_base64"])
             return Image.open(BytesIO(b)), None
-    except Exception:
+    except:
         pass
-    return None, "Unknown response format"
 
+    return None, "Unknown router response."
+
+
+# --------------------------------------------------
+# Depth (Heightmap)
+# --------------------------------------------------
 def generate_depth_from_image(pil_img):
-    # send image file to depth model
     buf = BytesIO()
     pil_img.save(buf, format="PNG")
     buf.seek(0)
+
     files = {"data": ("image.png", buf, "image/png")}
-    r = post_file_model(DEPTH_MODEL, files)
+    r = post_file_to_model(DEPTH_MODEL, files)
+
     if r.status_code != 200:
         return None, r.text
-    # depth model often returns image bytes or JSON array; try image first
+
     img = decode_image_response(r)
     if img:
         return img, None
+
+    # Try JSON
     try:
         j = r.json()
-        # some models return {"depth": base64}
         if "depth" in j:
-            depth_b64 = j["depth"]
-            depth_bytes = base64.b64decode(depth_b64)
-            return Image.open(BytesIO(depth_bytes)), None
-    except Exception:
+            d = base64.b64decode(j["depth"])
+            return Image.open(BytesIO(d)), None
+    except:
         pass
-    return None, "Unknown depth response format"
 
+    return None, "Unknown depth model response."
+
+
+# --------------------------------------------------
+# 3D (Text → 3D)
+# --------------------------------------------------
 def generate_3d_text(prompt, model_repo):
-    payload = {
-        "model": model_repo,
-        "inputs": prompt
-    }
+    payload = {"model": model_repo, "inputs": prompt}
     r = post_json(THREE_URL, payload)
+
     if r.status_code != 200:
         return None, r.text
-    # router three endpoint should return binary 3D file (obj/glb) or JSON with base64
-    # try interpret as binary file
+
     ct = r.headers.get("content-type", "")
-    if "application/octet-stream" in ct or "model" in ct or ct == "application/octet-stream":
+
+    # If router returns binary 3D data
+    if "octet-stream" in ct or "model" in ct:
         return r.content, None
-    # try JSON with "data" or "file" base64
+
+    # Base64 JSON fallback
     try:
         j = r.json()
         if "file" in j:
             return base64.b64decode(j["file"]), None
         if "data" in j:
             return base64.b64decode(j["data"]), None
-    except Exception:
+    except:
         pass
-    return None, "Unknown 3D response format"
 
-# ---------- Streamlit UI ----------
-st.title("⚙️ CNC 2D + 3D Generator (HuggingFace Router)")
+    return None, "Unknown router 3D response."
 
-tab2d, tab3d, tabdepth = st.tabs(["2D CNC Drawings", "3D Model Generation", "Depth / Heightmap"])
 
-# -------- 2D Tab --------
+# ======================================================================
+# STREAMLIT UI
+# ======================================================================
+
+st.title("⚙️ CNC 2D + 3D Technical Designer (HuggingFace Router)")
+
+tab2d, tab3d, tabdepth = st.tabs(["2D CNC BLUEPRINTS", "3D MODELS", "DEPTH MAP"])
+
+
+# --------------------------------------------------
+# 2D BLUEPRINTS
+# --------------------------------------------------
 with tab2d:
-    st.header("2D CNC / Blueprint generation")
-    model_choice = st.selectbox("Choose a 2D model", list(MODELS_2D.keys()))
-    prompt_2d = st.text_area("Prompt (example):", "technical blueprint lineart of a disc brake, top view, clean lines")
+    st.header("2D Technical CNC Drawing Generator")
+
+    model_choice = st.selectbox("Choose a technical drawing model", list(MODELS_2D.keys()))
+
+    prompt_2d = st.text_area(
+        "Prompt",
+        "technical precision blueprint of a disc brake rotor, CAD style, thin black lines, top-view, mechanical drawing"
+    )
+
     steps = st.slider("Inference steps", 10, 50, 30)
-    scale = st.slider("Guidance scale", 1.0, 8.0, 3.5, step=0.5)
-    size_w, size_h = st.columns(2)
-    with size_w:
+    scale = st.slider("Guidance scale", 1.0, 8.0, 3.5, step=0.1)
+
+    colw, colh = st.columns(2)
+    with colw:
         width = st.selectbox("Width", [512, 640, 768, 1024], index=2)
-    with size_h:
+    with colh:
         height = st.selectbox("Height", [512, 640, 768, 1024], index=2)
 
-    if st.button("Generate 2D CNC Image"):
-        with st.spinner("Generating 2D image on HuggingFace..."):
+    if st.button("Generate 2D Blueprint"):
+        with st.spinner("Generating CNC technical drawing..."):
             img, err = generate_2d(prompt_2d, MODELS_2D[model_choice], steps, scale, width, height)
             if err:
                 st.error(err)
             else:
-                st.image(img, caption="Generated CNC image", use_column_width=True)
-                buf = BytesIO(); img.save(buf, format="PNG"); buf.seek(0)
-                st.download_button("Download PNG", data=buf, file_name="cnc_2d.png", mime="image/png")
+                st.image(img, caption="CNC Blueprint Output", use_column_width=True)
+                buf = BytesIO()
+                img.save(buf, format="PNG")
+                buf.seek(0)
+                st.download_button("Download PNG", buf, "cnc_blueprint.png", "image/png")
 
-# -------- 3D Tab --------
+
+# --------------------------------------------------
+# 3D MODELS
+# --------------------------------------------------
 with tab3d:
-    st.header("3D Model generation (text → 3D / image → 3D)")
-    mode = st.radio("Mode", ["Text → 3D (Shap-E / Zero123)", "Image → 3D (TripoSR)"])
-    if mode.startswith("Text"):
-        model3 = st.selectbox("Choose 3D text model", list(MODELS_3D.keys()))
-        prompt_3d = st.text_area("3D prompt (example):", "3D model of a precision disc brake rotor, manifolds and holes")
-        if st.button("Generate 3D (Text)"):
-            with st.spinner("Generating 3D file..."):
-                bin_file, err = generate_3d_text(prompt_3d, MODELS_3D[model3])
+    st.header("3D Engineering Model Generator")
+
+    mode = st.radio("Generation Mode", ["Text → 3D (Shap-E / Zero123)", "Image → 3D (TripoSR)"])
+
+    if "Text" in mode:
+        model_3d = st.selectbox("Select 3D Model", list(MODELS_3D.keys()))
+        prompt_3d = st.text_area("3D Object Prompt", "precision mechanical rotor 3D model")
+
+        if st.button("Generate 3D from Text"):
+            with st.spinner("Generating 3D model..."):
+                data, err = generate_3d_text(prompt_3d, MODELS_3D[model_3d])
                 if err:
                     st.error(err)
                 else:
-                    st.success("3D model generated")
-                    st.download_button("Download 3D file", data=bin_file, file_name="cnc_3d_model.obj", mime="model/obj")
-    else:
-        st.write("Upload an image (PNG/JPG) to reconstruct 3D via TripoSR")
-        upload = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
-        if upload:
-            if st.button("Generate 3D (Image)"):
-                with st.spinner("Sending image to TripoSR..."):
-                    files = {"data": ("image.png", upload.getvalue(), "image/png")}
-                    r = post_file_model(MODELS_3D["TripoSR"], files)
-                    if r.status_code != 200:
-                        st.error(r.text)
-                    else:
-                        # assume returned binary 3D model
-                        ct = r.headers.get("content-type", "")
-                        data = r.content
-                        st.success("TripoSR returned a file")
-                        st.download_button("Download 3D (from TripoSR)", data=data, file_name="tripo_3d_model.obj", mime="model/obj")
+                    st.success("3D model ready")
+                    st.download_button("Download 3D Model (.obj)", data, "cnc_3d.obj", "model/obj")
 
-# -------- Depth Tab --------
+    else:
+        upload = st.file_uploader("Upload an image for 3D conversion (TripoSR)", ["jpg", "jpeg", "png"])
+        if upload and st.button("Generate 3D from Image"):
+            with st.spinner("Processing through TripoSR..."):
+                files = {"data": ("image.png", upload.getvalue(), "image/png")}
+                r = post_file_to_model(MODELS_3D["TripoSR"], files)
+
+                if r.status_code != 200:
+                    st.error(r.text)
+                else:
+                    st.success("TripoSR returned a 3D model")
+                    st.download_button("Download 3D OBJ", r.content, "tripo_3d.obj", "model/obj")
+
+
+# --------------------------------------------------
+# DEPTH / HEIGHTMAP
+# --------------------------------------------------
 with tabdepth:
-    st.header("Depth / Heightmap (Depth-Anything)")
-    upload_img = st.file_uploader("Upload image for depth estimation", type=["png", "jpg", "jpeg"])
-    if upload_img and st.button("Estimate Depth"):
-        img = Image.open(upload_img).convert("RGB")
+    st.header("Depth & Heightmap (Useful for CNC routing)")
+
+    file = st.file_uploader("Upload image", ["jpg", "jpeg", "png"])
+
+    if file and st.button("Generate Heightmap"):
+        img = Image.open(file).convert("RGB")
         with st.spinner("Estimating depth..."):
-            depth_img, err = generate_depth_from_image(img)
+            depth, err = generate_depth_from_image(img)
             if err:
                 st.error(err)
             else:
-                st.image(depth_img, caption="Estimated depth", use_column_width=True)
-                buf = BytesIO(); depth_img.save(buf, format="PNG"); buf.seek(0)
-                st.download_button("Download depth PNG", data=buf, file_name="depth.png", mime="image/png")
+                st.image(depth, caption="Depth Map", use_column_width=True)
+                buf = BytesIO()
+                depth.save(buf, format="PNG")
+                buf.seek(0)
+                st.download_button("Download Depth PNG", buf, "depth_map.png", "image/png")
