@@ -17,7 +17,7 @@ headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 MODELS = {
     "FLUX.1-dev (Lineart / Mechanical)": "black-forest-labs/FLUX.1-dev",
     "Stable Diffusion XL (2D CNC Blueprints)": "stabilityai/stable-diffusion-xl-base-1.0",
-    "Stable Diffusion 3 Medium (3D Render)": "TensorStack/RealisticVision_v6-onnx"
+    "RealisticVision (3D Render)": "TensorStack/RealisticVision_v6-onnx"
 }
 
 # -------------------------------
