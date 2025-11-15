@@ -5,3 +5,4 @@ streamlit-3d
 pydeck
 opencv-python
 numpy
+pandas
