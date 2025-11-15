@@ -17,7 +17,7 @@ headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 MODELS = {
     "Sketchers(Lineart / Mechanical)": "black-forest-labs/FLUX.1-dev",
     "CAD Drawing XL (2D CNC Blueprints)": "stabilityai/stable-diffusion-xl-base-1.0",
-    "RealisticVision (3D Render)": "tencent/Hunyuan3D-2"
+    "RealisticVision (3D Render)": "stabilityai/stable-diffusion-3-medium-diffusers"
 }
 
 # -------------------------------
