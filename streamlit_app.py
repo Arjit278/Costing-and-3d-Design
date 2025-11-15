@@ -16,7 +16,7 @@ headers = {
 }
 
 # ---------------------------------------------------
-# ⚙️ Safe FLUX generation (no JSON crashes)
+# ⚙️ Safe FLUX generation (handles ALL output formats)
 # ---------------------------------------------------
 def generate_flux(prompt, width, height, guidance, steps):
 
@@ -32,32 +32,93 @@ def generate_flux(prompt, width, height, guidance, steps):
 
     response = requests.post(API_URL, headers=headers, json=payload)
 
-    # ---- Case 1: HF returns binary image ----
-    if "image" in response.headers.get("content-type", ""):
-        return Image.open(BytesIO(response.content))
+    content_type = response.headers.get("content-type", "")
 
-    # ---- Case 2: Try decode JSON ----
-    try:
-        data = response.json()
-
-        # Standard HF structure
-        if "generated_image" in data:
-            img_str = data["generated_image"]
-
-        elif isinstance(data, list) and "blob" in data[0]:
-            img_str = data[0]["blob"]
-
-        else:
-            st.error("Unexpected JSON format received.")
+    # -------------------------------------------------
+    # 🔹 CASE 1 — FLUX returns pure PNG binary
+    # -------------------------------------------------
+    if "image" in content_type:
+        try:
+            return Image.open(BytesIO(response.content))
+        except:
+            st.error("Failed to read PNG binary image.")
             return None
 
-        img_bytes = base64.b64decode(img_str)
-        return Image.open(BytesIO(img_bytes))
-
+    # -------------------------------------------------
+    # 🔹 CASE 2 — Try to decode JSON
+    # -------------------------------------------------
+    try:
+        data = response.json()
     except Exception:
-        # ---- Case 3: HF Router returned an HTML Error/Error Text ----
-        st.error("HF API error:\n\n" + response.text)
+        st.error("HF API returned non-JSON text:\n\n" + response.text)
         return None
+
+    # -------------------------------------------------
+    # 🔹 CASE 3 — { "images": ["base64..."] }
+    # -------------------------------------------------
+    if isinstance(data, dict) and "images" in data:
+        try:
+            img_bytes = base64.b64decode(data["images"][0])
+            return Image.open(BytesIO(img_bytes))
+        except:
+            pass
+
+    # -------------------------------------------------
+    # 🔹 CASE 4 — { "image": "base64..." }
+    # -------------------------------------------------
+    if "image" in data:
+        try:
+            img_bytes = base64.b64decode(data["image"])
+            return Image.open(BytesIO(img_bytes))
+        except:
+            pass
+
+    # -------------------------------------------------
+    # 🔹 CASE 5 — { "generated_image": "base64..." }
+    # -------------------------------------------------
+    if "generated_image" in data:
+        try:
+            img_bytes = base64.b64decode(data["generated_image"])
+            return Image.open(BytesIO(img_bytes))
+        except:
+            pass
+
+    # -------------------------------------------------
+    # 🔹 CASE 6 — { "output": "base64..." }
+    # -------------------------------------------------
+    if "output" in data:
+        try:
+            img_bytes = base64.b64decode(data["output"])
+            return Image.open(BytesIO(img_bytes))
+        except:
+            pass
+
+    # -------------------------------------------------
+    # 🔹 CASE 7 — Router returns list output
+    # -------------------------------------------------
+    if isinstance(data, list):
+
+        # { "blob": "base64..." }
+        if "blob" in data[0]:
+            try:
+                img_bytes = base64.b64decode(data[0]["blob"])
+                return Image.open(BytesIO(img_bytes))
+            except:
+                pass
+
+        # { "generated_image": "base64..." }
+        if "generated_image" in data[0]:
+            try:
+                img_bytes = base64.b64decode(data[0]["generated_image"])
+                return Image.open(BytesIO(img_bytes))
+            except:
+                pass
+
+    # -------------------------------------------------
+    # 🔹 Unknown format
+    # -------------------------------------------------
+    st.error("❌ FLUX returned an unsupported format:\n\n" + str(data))
+    return None
 
 
 # ---------------------------------------------------
@@ -67,14 +128,17 @@ def add_dimensions(img):
     draw = ImageDraw.Draw(img)
     w, h = img.size
 
-    draw.line((50, h-60, w-50, h-60), fill="black", width=2)
-    draw.line((50, h-80, 50, h-40), fill="black", width=2)
-    draw.line((w-50, h-80, w-50, h-40), fill="black", width=2)
+    # bottom dimension line
+    draw.line((50, h - 60, w - 50, h - 60), fill="black", width=2)
+    draw.line((50, h - 80, 50, h - 40), fill="black", width=2)
+    draw.line((w - 50, h - 80, w - 50, h - 40), fill="black", width=2)
 
+    # text (overall width)
     text = f"{w} mm"
-    draw.text((w//2 - 40, h-100), text, fill="black")
+    draw.text((w // 2 - 40, h - 100), text, fill="black")
 
     return img
+
 
 # ---------------------------------------------------
 # 🎛 Streamlit UI
@@ -105,3 +169,4 @@ if st.button("Generate Drawing"):
         st.image(image, caption="Generated CNC Blueprint", use_column_width=True)
         image.save("cnc_blueprint.png")
         st.success("Saved as cnc_blueprint.png")
+
