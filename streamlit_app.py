@@ -15,9 +15,9 @@ headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 #  Supported Models (Only those proven working with HF Router)
 # -------------------------------
 MODELS = {
-    "FLUX.1-dev (Lineart / Mechanical)": "black-forest-labs/FLUX.1-dev",
-    "Stable Diffusion XL (2D CNC Blueprints)": "stabilityai/stable-diffusion-xl-base-1.0",
-    "RealisticVision (3D Render)": "TensorStack/RealisticVision_v6-onnx"
+    "Sketchers(Lineart / Mechanical)": "black-forest-labs/FLUX.1-dev",
+    "CAD Drawing XL (2D CNC Blueprints)": "stabilityai/stable-diffusion-xl-base-1.0",
+    "RealisticVision (3D Render)": "stabilityai/TripoSR"
 }
 
 # -------------------------------
@@ -74,7 +74,7 @@ def safe_router_generate(model, prompt, width, height, steps, guidance):
 # -------------------------------
 # Streamlit UI
 # -------------------------------
-st.title("🛠 CNC Blueprint Generator (HF Router Stable Edition)")
+st.title("🛠 CNC Blueprint Generator (Pictorial Stable Edition)")
 
 prompt = st.text_area(
     "Enter prompt",
