@@ -6,13 +6,14 @@ import base64
 # Ensure you have the 'huggingface_hub' and 'Pillow' libraries installed
 from huggingface_hub import InferenceClient 
 
-# --- Hugging Face API Configuration ---
-# WARNING: Do NOT share your token publicly.
-# Replace the placeholder below with your actual, valid token manually.
-HF_TOKEN = "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" 
+# --- Hugging Face API Configuration (Reads securely from secrets file) ---
+try:
+    HF_TOKEN = st.secrets["HF_TOKEN"]
+except KeyError:
+    st.error("HF_TOKEN secret not found. Please add it to the App Settings > Secrets.")
+    st.stop() # Stops the script if the token is missing
 
 # Initialize the client (model is set later during the request)
-# Client will use the provided token for authorization
 client = InferenceClient(token=HF_TOKEN)
 
 def generate_image_hf_hub(prompt, width, height, steps, guidance, model_id):
@@ -35,8 +36,9 @@ def generate_image_hf_hub(prompt, width, height, steps, guidance, model_id):
 
     except Exception as e:
         st.error(f"API Error using huggingface_hub: {e}")
+        # Check if the error suggests a bad token or specific model issue
         if "Authentication" in str(e) or "invalid" in str(e).lower():
-            st.warning("Please verify your HF_TOKEN is valid and has access.")
+            st.warning("The API token might be invalid or the model requires different permissions.")
         return None
 
 # --- CNC Processing Functions (Placeholders) ---
@@ -96,19 +98,16 @@ with tab1:
         )
 
     if st.button("Generate Drawing", key="generate_button"):
-        if HF_TOKEN == "your_valid_hf_token_here":
-             st.warning("Please update the HF_TOKEN variable in the script with your personal access token.")
-        else:
-            with st.spinner("Generating CNC Drawing... this may take a moment."):
-                img = generate_image_hf_hub(prompt, width, height, steps, guidance, model_choice)
-                if img:
-                    st.image(img, caption="AI Generated CNC Design Output")
-                    st.download_button(
-                        label="Download Image",
-                        data=img,
-                        file_name="generated_design.png",
-                        mime="image/png"
-                    )
+        with st.spinner("Generating CNC Drawing... this may take a moment."):
+            img = generate_image_hf_hub(prompt, width, height, steps, guidance, model_choice)
+            if img:
+                st.image(img, caption="AI Generated CNC Design Output")
+                st.download_button(
+                    label="Download Image",
+                    data=img,
+                    file_name="generated_design.png",
+                    mime="image/png"
+                )
 
 with tab2:
     st.header("🔄 G-Code Converter")
