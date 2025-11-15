@@ -79,8 +79,7 @@ st.title("🛠 CNC Blueprint Generator (HF Router Stable Edition)")
 prompt = st.text_area("Enter prompt",
     "high-precision technical blueprint, CAD lineart, orthographic projection,
 mechanical disc brake assembly, thin blueprint lines, no shading, no textures,
-engineering drawing syle, black lines on black background
-")
+engineering drawing syle, black lines on black background")
 
 col1, col2 = st.columns(2)
 width = col1.number_input("Width", 128, 1536, 768)
