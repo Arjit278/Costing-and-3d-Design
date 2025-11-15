@@ -8,6 +8,7 @@ from huggingface_hub import InferenceClient
 
 # --- Hugging Face API Configuration (Reads securely from secrets file) ---
 try:
+    # This reads the HF_TOKEN from the Secrets Manager configured in your App Settings
     HF_TOKEN = st.secrets["HF_TOKEN"]
 except KeyError:
     st.error("HF_TOKEN secret not found. Please add it to the App Settings > Secrets.")
@@ -83,14 +84,16 @@ with tab1:
 
     col1, col2 = st.columns(2)
     with col1:
-        width = st.number_input("Width", 512, key="width_input")
-        height = st.number_input("Height", 512, key="height_input")
+        # Defaulting width/height higher as SDXL works better with larger resolutions
+        width = st.number_input("Width", 1024, key="width_input")
+        height = st.number_input("Height", 1024, key="height_input")
         steps = st.slider("Inference Steps", 5, 60, 30, key="steps_slider")
     with col2:
         guidance = st.slider("Guidance Scale", 1.0, 8.0, 3.5, key="guidance_slider")
         model_choice = st.selectbox(
             "Choose Model",
             [
+                "stabilityai/stable-diffusion-xl-base-1.0", # <-- New Model Added
                 "stabilityai/stable-diffusion-2-1",
                 "timbrooks/instruct-pix2pix",
             ],
