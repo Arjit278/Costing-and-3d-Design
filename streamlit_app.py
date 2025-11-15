@@ -4,22 +4,22 @@ import requests
 from io import BytesIO
 from PIL import Image, ImageDraw
 
-# -------------------------------------
-# 🔐 HuggingFace API Token (Loaded Securely)
-# -------------------------------------
-HF_TOKEN = st.secrets["HF_TOKEN"]
-
+# ---------------------------------------------------
+# 🔐 HuggingFace Token (from Streamlit App Secrets)
+# ---------------------------------------------------
+HF_TOKEN = st.secrets.get("HF_TOKEN")
 API_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev"
 
 headers = {
     "Authorization": f"Bearer {HF_TOKEN}",
-    "Content-Type": "application/json"
+    "Accept": "application/json"
 }
 
-# -------------------------------------
-# 📌 Function — Call FLUX API
-# -------------------------------------
+# ---------------------------------------------------
+# ⚙️ Safe FLUX generation (no JSON crashes)
+# ---------------------------------------------------
 def generate_flux(prompt, width, height, guidance, steps):
+
     payload = {
         "inputs": prompt,
         "parameters": {
@@ -32,49 +32,54 @@ def generate_flux(prompt, width, height, guidance, steps):
 
     response = requests.post(API_URL, headers=headers, json=payload)
 
-    if response.status_code != 200:
-        st.error("❌ API Error: " + response.text)
+    # ---- Case 1: HF returns binary image ----
+    if "image" in response.headers.get("content-type", ""):
+        return Image.open(BytesIO(response.content))
+
+    # ---- Case 2: Try decode JSON ----
+    try:
+        data = response.json()
+
+        # Standard HF structure
+        if "generated_image" in data:
+            img_str = data["generated_image"]
+
+        elif isinstance(data, list) and "blob" in data[0]:
+            img_str = data[0]["blob"]
+
+        else:
+            st.error("Unexpected JSON format received.")
+            return None
+
+        img_bytes = base64.b64decode(img_str)
+        return Image.open(BytesIO(img_bytes))
+
+    except Exception:
+        # ---- Case 3: HF Router returned an HTML Error/Error Text ----
+        st.error("HF API error:\n\n" + response.text)
         return None
 
-    data = response.json()
 
-    # Standard HF Router format
-    if "generated_image" in data:
-        img_str = data["generated_image"]
-
-    # Sometimes proxy returns list + blob
-    elif isinstance(data, list) and "blob" in data[0]:
-        img_str = data[0]["blob"]
-
-    else:
-        st.error("❌ Unexpected API format received")
-        return None
-
-    img_bytes = base64.b64decode(img_str)
-    return Image.open(BytesIO(img_bytes))
-
-# -------------------------------------
-# ➕ Add Dimensions to Drawing
-# -------------------------------------
+# ---------------------------------------------------
+# ➕ Add CNC Dimensions
+# ---------------------------------------------------
 def add_dimensions(img):
     draw = ImageDraw.Draw(img)
     w, h = img.size
 
-    # Horizontal dimension line
-    draw.line((50, h - 60, w - 50, h - 60), fill="black", width=2)
-    draw.line((50, h - 80, 50, h - 40), fill="black", width=2)
-    draw.line((w - 50, h - 80, w - 50, h - 40), fill="black", width=2)
+    draw.line((50, h-60, w-50, h-60), fill="black", width=2)
+    draw.line((50, h-80, 50, h-40), fill="black", width=2)
+    draw.line((w-50, h-80, w-50, h-40), fill="black", width=2)
 
-    # Dimension text
     text = f"{w} mm"
-    draw.text((w // 2 - 40, h - 100), text, fill="black")
+    draw.text((w//2 - 40, h-100), text, fill="black")
 
     return img
 
-# -------------------------------------
-# 🎨 Streamlit UI
-# -------------------------------------
-st.title("🎛 CNC Technical Drawing Generator (FLUX + HF Router API)")
+# ---------------------------------------------------
+# 🎛 Streamlit UI
+# ---------------------------------------------------
+st.title("🎛 CNC Technical Drawing Generator (FLUX via HF Router)")
 
 prompt = st.text_area(
     "Enter Technical Prompt",
