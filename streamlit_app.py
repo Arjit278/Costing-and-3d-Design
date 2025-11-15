@@ -1,79 +1,100 @@
 import streamlit as st
 import requests
 import base64
+from io import BytesIO
+from PIL import Image
 import json
 
-# ------------------------------
-# Hugging Face Token
-# ------------------------------
-HF_TOKEN = st.secrets.get("HF_TOKEN", "")
+# -------------------------------
+#  Hugging Face Token
+# -------------------------------
+HF_TOKEN = st.secrets["HF_TOKEN"]
+headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-headers = {
-    "Authorization": f"Bearer {HF_TOKEN}",
-    "Content-Type": "application/json"
+# -------------------------------
+#  Supported Models (Only those proven working with HF Router)
+# -------------------------------
+MODELS = {
+    "FLUX.1-dev (Lineart / Mechanical)": "black-forest-labs/FLUX.1-dev",
+    "Stable Diffusion XL (2D CNC Blueprints)": "stabilityai/stable-diffusion-xl-base-1.0",
+    "Stable Diffusion 3 Medium (3D Render)": "stabilityai/stable-diffusion-3-medium"
 }
 
-# ------------------------------
+# -------------------------------
+# Safe HF Router Call
+# -------------------------------
+def safe_router_generate(model, prompt, width, height, steps, guidance):
+    url = f"https://router.huggingface.co/hf-inference/models/{model}"
+
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "width": width,
+            "height": height,
+            "num_inference_steps": steps,
+            "guidance_scale": guidance
+        }
+    }
+
+    resp = requests.post(url, headers=headers, json=payload)
+
+    # -------------------------------
+    # 1. Handle No Body Returned
+    # -------------------------------
+    if not resp.content or resp.text.strip() == "":
+        st.error("❌ Router returned EMPTY response.")
+        return None
+
+    # -------------------------------
+    # 2. Try JSON First
+    # -------------------------------
+    try:
+        data = resp.json()
+        if "images" in data:
+            img_data = base64.b64decode(data["images"][0])
+            return Image.open(BytesIO(img_data))
+    except:
+        pass  # Continue to next checks
+
+    # -------------------------------
+    # 3. Check If Raw Image (PNG/JPEG)
+    # -------------------------------
+    if "image" in resp.headers.get("content-type", ""):
+        return Image.open(BytesIO(resp.content))
+
+    # -------------------------------
+    # 4. Show Raw Response For Debugging
+    # -------------------------------
+    st.error("⚠ RAW HF ROUTER RESPONSE (NOT JSON):")
+    st.code(resp.text)
+
+    return None
+
+
+# -------------------------------
 # Streamlit UI
-# ------------------------------
+# -------------------------------
 st.title("🛠 CNC Blueprint Generator (HF Router Stable Edition)")
 
-prompt = st.text_area("Enter prompt", 
-                      "technical CNC blueprint lineart of disc brake, thin black lines, engineering drawing")
+prompt = st.text_area("Enter prompt",
+    "technical CNC blueprint of disc brake, clean thin lines, engineering drawing")
 
-width = st.number_input("Width", 256, 2048, 768)
-height = st.number_input("Height", 256, 2048, 768)
-steps = st.slider("Inference Steps", 5, 60, 20)
-guidance = st.slider("Guidance Scale", 1.0, 20.0, 5.0)
+col1, col2 = st.columns(2)
+width = col1.number_input("Width", 128, 1536, 768)
+height = col2.number_input("Height", 128, 1536, 768)
 
-model = st.selectbox(
-    "Choose Model",
-    [
-        "black-forest-labs/FLUX.1-schnell",
-        "black-forest-labs/FLUX.1-dev",
-        "stabilityai/stable-diffusion-xl-base-1.0",
-        "stabilityai/stable-diffusion-3-medium",
-        "stabilityai/stable-diffusion-2-1"
-    ]
-)
+steps = st.slider("Inference Steps", 5, 80, 25)
+guidance = st.slider("Guidance Scale", 1.0, 20.0, 3.5)
+
+model_choice = st.selectbox("Choose Model", list(MODELS.keys()))
+model = MODELS[model_choice]
 
 if st.button("Generate Blueprint"):
-    with st.spinner("Generating CNC drawing..."):
+    with st.spinner("Generating..."):
+        img = safe_router_generate(model, prompt, width, height, steps, guidance)
 
-        # ✔ Correct new HF Router URL
-        api_url = f"https://router.huggingface.co/hf-inference/models/{model}"
-
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "width": width,
-                "height": height,
-                "num_inference_steps": steps,
-                "guidance_scale": guidance,
-            }
-        }
-
-        try:
-            resp = requests.post(api_url, headers=headers, json=payload, timeout=40)
-
-            if resp.status_code != 200:
-                st.error(f"API Error {resp.status_code}: {resp.text}")
-            else:
-                data = resp.json()
-                image_base64 = data[0].get("generated_image")
-
-                if not image_base64:
-                    st.error("No image returned. Model may not support the requested parameters.")
-                else:
-                    image_bytes = base64.b64decode(image_base64)
-                    st.image(image_bytes, caption="Generated CNC Blueprint")
-
-                    st.download_button(
-                        "Download Image",
-                        data=image_bytes,
-                        file_name="blueprint.png",
-                        mime="image/png"
-                    )
-
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
+    if img:
+        st.image(img, caption="Generated Output", use_column_width=True)
+        img.save("output.png")
+        st.success("Saved as output.png")
+        st.download_button("Download PNG", open("output.png", "rb"), "output.png")
