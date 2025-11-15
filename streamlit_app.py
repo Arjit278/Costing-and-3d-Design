@@ -3,64 +3,50 @@ import pandas as pd
 import time
 import requests
 import base64
+# Ensure you have the 'huggingface_hub' and 'Pillow' libraries installed
+from huggingface_hub import InferenceClient 
 
 # --- Hugging Face API Configuration ---
-# WARNING: Exposing tokens in public code is a security risk.
-# For production use, manage this token securely in Hugging Face Space secrets.
-HF_TOKEN = "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"
+# WARNING: Do NOT share your token publicly.
+# Replace the placeholder below with your actual, valid token manually.
+HF_TOKEN = "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" 
 
-def generate_image(prompt, width, height, steps, guidance, model_id):
-    """Calls the Hugging Face router API to generate an image from a prompt."""
-    url = "https://router.huggingface.co/hf-inference"
+# Initialize the client (model is set later during the request)
+# Client will use the provided token for authorization
+client = InferenceClient(token=HF_TOKEN)
 
-    headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
-        "X-Model": model_id,
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "width": width,
-            "height": height,
-            "num_inference_steps": steps,
-            "guidance_scale": guidance
-        }
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-
-    # Handle both JSON responses (base64 encoded) and raw image bytes
+def generate_image_hf_hub(prompt, width, height, steps, guidance, model_id):
+    """Uses the huggingface_hub client to generate an image."""
     try:
-        data = response.json()
-        if "error" in data:
-            st.error(f"API Error: {data['error']}")
-            return None
-        # base64 encoded
-        img_base64 = data["generated_image"]
-        return base64.b64decode(img_base64)
-    except:
-        # Try raw bytes if JSON parsing fails
-        if response.status_code == 200:
-            return response.content
-        else:
-            st.error(f"Raw API error: {response.text}")
-            return None
+        # The client handles the request and authentication
+        image_bytes = client.text_to_image(
+            model=model_id,
+            prompt=prompt,
+            width=width,
+            height=height,
+            num_inference_steps=steps,
+            guidance_scale=guidance,
+        )
+        # Convert PIL image to bytes for Streamlit
+        import io
+        img_byte_arr = io.BytesIO()
+        image_bytes.save(img_byte_arr, format='PNG')
+        return img_byte_arr.getvalue()
 
+    except Exception as e:
+        st.error(f"API Error using huggingface_hub: {e}")
+        if "Authentication" in str(e) or "invalid" in str(e).lower():
+            st.warning("Please verify your HF_TOKEN is valid and has access.")
+        return None
 
 # --- CNC Processing Functions (Placeholders) ---
 
 def process_cad_file(uploaded_file):
     """
     Simulates processing a CAD file to generate G-code commands.
-    In a real app, this would use a library (e.g., a custom parser or pygcode)
-    to read the CAD data and convert it into G-code instructions.
     """
     st.write("Processing CAD file...")
-    time.sleep(2) # Simulate processing time
-
-    # Simulate G-code generation
+    time.sleep(2) 
     g_code_output = f"; G-code generated from {uploaded_file.name}\n"
     g_code_output += "G21 ; Set units to millimeters\n"
     g_code_output += "G90 ; Use absolute positioning\n"
@@ -83,7 +69,6 @@ def process_cad_file(uploaded_file):
 
 st.title("Integrated CNC Design and Workflow Application")
 
-# Use tabs to organize the two distinct features
 tab1, tab2 = st.tabs(["💡 AI Design Generator", "🔄 CAD File to G-Code Workflow"])
 
 with tab1:
@@ -94,7 +79,6 @@ with tab1:
                           "technical CNC blueprint lineart of disc brake, top view, thin black lines, engineering drawing",
                           key="design_prompt")
 
-    # Layout parameters side-by-side
     col1, col2 = st.columns(2)
     with col1:
         width = st.number_input("Width", 512, key="width_input")
@@ -105,25 +89,26 @@ with tab1:
         model_choice = st.selectbox(
             "Choose Model",
             [
-                "black-forest-labs/FLUX.1-dev",
                 "stabilityai/stable-diffusion-2-1",
-                "timbrooks/instruct-pix2pix"
+                "timbrooks/instruct-pix2pix",
             ],
             key="model_select"
         )
 
     if st.button("Generate Drawing", key="generate_button"):
-        with st.spinner("Generating CNC Drawing... this may take a moment."):
-            img = generate_image(prompt, width, height, steps, guidance, model_choice)
-            if img:
-                st.image(img, caption="AI Generated CNC Design Output")
-                # Optional: Add download button for the generated image
-                st.download_button(
-                    label="Download Image",
-                    data=img,
-                    file_name="generated_design.png",
-                    mime="image/png"
-                )
+        if HF_TOKEN == "your_valid_hf_token_here":
+             st.warning("Please update the HF_TOKEN variable in the script with your personal access token.")
+        else:
+            with st.spinner("Generating CNC Drawing... this may take a moment."):
+                img = generate_image_hf_hub(prompt, width, height, steps, guidance, model_choice)
+                if img:
+                    st.image(img, caption="AI Generated CNC Design Output")
+                    st.download_button(
+                        label="Download Image",
+                        data=img,
+                        file_name="generated_design.png",
+                        mime="image/png"
+                    )
 
 with tab2:
     st.header("🔄 G-Code Converter")
@@ -153,4 +138,3 @@ with tab2:
             )
     else:
         st.info("Please upload a file to begin this workflow.")
-
