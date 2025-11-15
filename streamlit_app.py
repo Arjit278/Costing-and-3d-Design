@@ -76,10 +76,11 @@ def safe_router_generate(model, prompt, width, height, steps, guidance):
 # -------------------------------
 st.title("🛠 CNC Blueprint Generator (HF Router Stable Edition)")
 
-prompt = st.text_area("Enter prompt",
-    "high-precision technical blueprint, CAD lineart, orthographic projection,
+prompt = st.text_area(
+    "Enter prompt",
+    """high-precision technical blueprint, CAD lineart, orthographic projection,
 mechanical disc brake assembly, thin blueprint lines, no shading, no textures,
-engineering drawing syle, black lines on black background"
+engineering drawing style, black lines on white background"""
 )
 
 col1, col2 = st.columns(2)
