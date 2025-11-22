@@ -177,7 +177,8 @@ st.subheader("Create Engineering Drawing using HF Router Models")
 MODELS = {
     "Sketchers (Lineart / Mechanical)": "black-forest-labs/FLUX.1-dev",
     "CAD Drawing XL (2D CNC Blueprints)": "stabilityai/stable-diffusion-xl-base-1.0",
-    "RealisticVision (3D)": "stabilityai/stable-diffusion-3-medium-diffusers"
+    "RealisticVision (3D)": "stabilityai/stable-diffusion-3-medium-diffusers",
+    "ehristoforu/dalle-3-xl-v2"
 }
 
 model_choice = st.selectbox("Model", list(MODELS.keys()))
