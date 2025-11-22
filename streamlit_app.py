@@ -1,30 +1,59 @@
-import streamlit as st
-import requests
+import io
 import base64
-from io import BytesIO
+import requests
+import streamlit as st
 from PIL import Image
-import json
 
-# -------------------------------
-#  Hugging Face Token
-# -------------------------------
-HF_TOKEN = st.secrets["HF_TOKEN"]
-headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+# ------------------------------
+# 🔐 SIMPLE LOGIN SYSTEM
+# ------------------------------
+st.set_page_config(page_title="Pictator Creator Cloud", layout="wide")
 
-# -------------------------------
-#  Supported Models (Only those proven working with HF Router)
-# -------------------------------
-MODELS = {
-    "Sketchers(Lineart / Mechanical)": "black-forest-labs/FLUX.1-dev",
-    "CAD Drawing XL (2D CNC Blueprints)": "stabilityai/stable-diffusion-xl-base-1.0",
-    "RealisticVision (3D Render)": "stabilityai/stable-diffusion-3-medium-diffusers"
-}
+st.title("🔐 Login Required")
 
-# -------------------------------
-# Safe HF Router Call
-# -------------------------------
-def safe_router_generate(model, prompt, width, height, steps, guidance):
-    url = f"https://router.huggingface.co/hf-inference/models/{model}"
+# Hardcoded user/pass for Streamlit Cloud
+VALID_USERNAME = "admin"
+VALID_PASSWORD = "1234"
+
+# Session state for login
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        login_btn = st.form_submit_button("Login")
+
+    if login_btn:
+        if username == VALID_USERNAME and password == VALID_PASSWORD:
+            st.session_state.logged_in = True
+            st.rerun()
+        else:
+            st.error("❌ Invalid Username or Password")
+    st.stop()
+
+# ------------------------------
+# 🎨 After Login: Pictator Creator (Tab 4 Only)
+# ------------------------------
+
+st.title("🎨 Pictator Creator (HF Router Only)")
+
+HF_TOKEN = st.sidebar.text_input("HuggingFace Token (HF_TOKEN)", type="password")
+
+# ------------------------------
+# HF Router Running Function (Image Generator)
+# ------------------------------
+HF_ROUTER_BASE = "https://router.huggingface.co/hf-inference/models"
+
+def hf_router_generate_image(model_repo: str, prompt: str, hf_token: str,
+                             width=1024, height=1024, steps=30, guidance=3.5):
+
+    if not hf_token:
+        return {"type": "error", "data": "[HF_TOKEN missing]"}
+
+    url = f"{HF_ROUTER_BASE}/{model_repo}"
+    headers = {"Authorization": f"Bearer {hf_token}"}
 
     payload = {
         "inputs": prompt,
@@ -36,69 +65,82 @@ def safe_router_generate(model, prompt, width, height, steps, guidance):
         }
     }
 
-    resp = requests.post(url, headers=headers, json=payload)
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=120)
+    except Exception as e:
+        return {"type": "error", "data": f"[HF Router request failed: {e}]"}
 
-    # -------------------------------
-    # 1. Handle No Body Returned
-    # -------------------------------
-    if not resp.content or resp.text.strip() == "":
-        st.error("❌ Router returned EMPTY response.")
-        return None
+    # Direct Image
+    if resp.status_code == 200 and "image" in resp.headers.get("content-type", ""):
+        try:
+            img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+            return {"type": "image", "data": img}
+        except Exception as e:
+            return {"type": "error", "data": f"[HF decode failed: {e}]"}
 
-    # -------------------------------
-    # 2. Try JSON First
-    # -------------------------------
+    # JSON fallback
     try:
         data = resp.json()
-        if "images" in data:
-            img_data = base64.b64decode(data["images"][0])
-            return Image.open(BytesIO(img_data))
     except:
-        pass  # Continue to next checks
+        return {"type": "error", "data": resp.text[:400]}
 
-    # -------------------------------
-    # 3. Check If Raw Image (PNG/JPEG)
-    # -------------------------------
-    if "image" in resp.headers.get("content-type", ""):
-        return Image.open(BytesIO(resp.content))
+    try:
+        if isinstance(data, dict) and "generated_image" in data:
+            img_bytes = base64.b64decode(data["generated_image"])
+            return {"type": "image", "data": Image.open(io.BytesIO(img_bytes)).convert("RGB")}
 
-    # -------------------------------
-    # 4. Show Raw Response For Debugging
-    # -------------------------------
-    st.error("⚠ RAW HF ROUTER RESPONSE (NOT JSON):")
-    st.code(resp.text)
+        if isinstance(data, dict) and "images" in data:
+            img_bytes = base64.b64decode(data["images"][0])
+            return {"type": "image", "data": Image.open(io.BytesIO(img_bytes)).convert("RGB")}
+    except Exception as e:
+        return {"type": "error", "data": f"[HF parse error: {e}]"}
 
-    return None
+    return {"type": "error", "data": f"Unsupported response: {data}"}
 
 
-# -------------------------------
-# Streamlit UI
-# -------------------------------
-st.title("🛠 CNC Blueprint Generator (Pictorial Stable Edition)")
+# ------------------------------
+# UI – Pictator Creator Only
+# ------------------------------
+
+st.subheader("Create Engineering Drawing using HF Router Models")
+
+MODELS = {
+    "Sketchers (Lineart / Mechanical)": "black-forest-labs/FLUX.1-dev",
+    "CAD Drawing XL (2D CNC Blueprints)": "stabilityai/stable-diffusion-xl-base-1.0",
+    "RealisticVision (3D)": "stabilityai/stable-diffusion-3-medium-diffusers"
+}
+
+model_choice = st.selectbox("Model", list(MODELS.keys()))
 
 prompt = st.text_area(
-    "Enter prompt",
-    """high-precision technical blueprint, CAD lineart, orthographic projection,
-mechanical disc brake assembly, thin blueprint lines, no shading, no textures,
-engineering drawing style, black lines on white background"""
+    "Prompt",
+    "technical CNC blueprint, mechanical disc brake, top view, thin black engineering lineart"
 )
 
 col1, col2 = st.columns(2)
-width = col1.number_input("Width", 128, 1536, 768)
-height = col2.number_input("Height", 128, 1536, 768)
+with col1:
+    width = st.number_input("Width", 256, 1536, 768)
+with col2:
+    height = st.number_input("Height", 256, 1536, 768)
 
-steps = st.slider("Inference Steps", 5, 80, 25)
-guidance = st.slider("Guidance Scale", 1.0, 20.0, 3.5)
+steps = st.slider("Inference Steps", 5, 80, 30)
+guidance = st.slider("Guidance Scale", 1.0, 12.0, 3.5)
 
-model_choice = st.selectbox("Choose Model", list(MODELS.keys()))
-model = MODELS[model_choice]
+if st.button("Generate"):
+    with st.spinner("Generating image from HuggingFace Router..."):
+        repo = MODELS[model_choice]
+        out = hf_router_generate_image(
+            repo, prompt, HF_TOKEN,
+            width=width, height=height,
+            steps=steps, guidance=guidance
+        )
 
-if st.button("Generate Blueprint"):
-    with st.spinner("Generating..."):
-        img = safe_router_generate(model, prompt, width, height, steps, guidance)
+    if out["type"] == "image":
+        img = out["data"]
+        st.image(img, caption="Generated Drawing", use_column_width=True)
 
-    if img:
-        st.image(img, caption="Generated Output", use_column_width=True)
-        img.save("output.png")
-        st.success("Saved as output.png")
-        st.download_button("Download PNG", open("output.png", "rb"), "output.png")
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        st.download_button("Download PNG", buf.getvalue(), "pictator.png")
+    else:
+        st.error(out["data"])
