@@ -3,9 +3,10 @@ import base64
 import requests
 import streamlit as st
 from PIL import Image
+from datetime import datetime
 
 # --------------------------------------
-# 🔧 PAGE CONFIG + DARK THEME + LOGO
+# 🔧 PAGE CONFIG + HEADER
 # --------------------------------------
 st.set_page_config(
     page_title="Pictator Creator",
@@ -24,16 +25,40 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# =====================================================================
+# 🔵 GLOBAL USAGE TRACKER (PERSISTENT ON STREAMLIT CLOUD)
+# =====================================================================
+@st.cache_resource
+def init_usage_store():
+    return {
+        "total_count": 0,
+        "users": {}  # { username: {"count": X, "last_used": timestamp} }
+    }
+
+usage_store = init_usage_store()
+
+def update_usage(username, success=True):
+    if success:
+        usage_store["total_count"] += 1
+
+        if username not in usage_store["users"]:
+            usage_store["users"][username] = {"count": 0, "last_used": None}
+
+        usage_store["users"][username]["count"] += 1
+        usage_store["users"][username]["last_used"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 # --------------------------------------
-# 🔐 USER STORAGE (LOCAL TO SESSION)
+# 🔐 USER STORAGE (PER SESSION)
 # --------------------------------------
 if "users" not in st.session_state:
     st.session_state.users = {
-        "mkipl": "mkipl123",    # default sample user
+        "mkipl": "mkipl123",
     }
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
@@ -41,11 +66,10 @@ ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "")
 HF_TOKEN_SECRET = st.secrets.get("HF_TOKEN", "")
 
 # --------------------------------------
-# SIDEBAR LOGIN / LOGOUT
+# 🔐 SIDEBAR LOGIN / LOGOUT
 # --------------------------------------
 st.sidebar.title("🔐 Login Panel")
 
-# If logged in → show logout
 if st.session_state.logged_in:
     st.sidebar.success(f"Logged in as: {st.session_state.current_user}")
     if st.sidebar.button("🚪 Logout"):
@@ -53,7 +77,6 @@ if st.session_state.logged_in:
         st.session_state.current_user = None
         st.rerun()
 else:
-    # USER LOGIN FORM
     st.sidebar.subheader("User Login")
     username = st.sidebar.text_input("Username")
     password = st.sidebar.text_input("Password", type="password")
@@ -67,7 +90,7 @@ else:
             st.sidebar.error("❌ Invalid Username or Password")
 
 # --------------------------------------
-# 🔐 ADMIN PANEL (SIDEBAR)
+# 🛠 ADMIN PANEL
 # --------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("🛠 Admin Access")
@@ -77,28 +100,39 @@ admin_pass = st.sidebar.text_input("Admin Password", type="password")
 if admin_pass == ADMIN_PASSWORD:
     st.sidebar.success("Admin Verified ✔")
 
+    # ➕ ADD USER
     st.sidebar.markdown("### ➕ Add User")
     new_user = st.sidebar.text_input("New Username")
     new_pass = st.sidebar.text_input("New Password")
 
     if st.sidebar.button("Add User"):
         if new_user.strip() == "":
-            st.sidebar.error("Username required")
+            st.sidebar.error("Username is required")
         else:
             st.session_state.users[new_user] = new_pass
             st.sidebar.success(f"User '{new_user}' added")
 
+    # ❌ DELETE USER
     st.sidebar.markdown("### ❌ Delete User")
-    del_user = st.sidebar.selectbox("Select user", list(st.session_state.users.keys()))
+    del_user = st.sidebar.selectbox("Select User", list(st.session_state.users.keys()))
     if st.sidebar.button("Delete User"):
         del st.session_state.users[del_user]
         st.sidebar.success(f"User '{del_user}' deleted")
 
+    # 📊 SHOW USERS
     st.sidebar.markdown("### 👥 Current Users")
     st.sidebar.json(st.session_state.users)
 
+    # 📊 ADMIN USAGE PANEL
+    st.sidebar.markdown("### 📊 Usage Stats")
+    st.sidebar.write(f"Total Usage: **{usage_store['total_count']}**")
+
+    for usr, data in usage_store["users"].items():
+        st.sidebar.write(f"**{usr}** → {data['count']} (Last: {data['last_used']})")
+
 else:
     st.sidebar.info("Admin panel locked")
+
 
 # --------------------------------------
 # STOP if not logged in
@@ -107,19 +141,27 @@ if not st.session_state.logged_in:
     st.warning("🔑 Please login to access Pictator Creator.")
     st.stop()
 
+current_user = st.session_state.current_user
+
 # =====================================================================
-# 🎨 TAB 4 – HF ROUTER IMAGE GENERATOR (UNCHANGED FUNCTIONALITY)
+# 🎨 TAB 4 – HF ROUTER IMAGE GENERATOR
 # =====================================================================
 
 HF_TOKEN = HF_TOKEN_SECRET
 
 st.title("🎨 Pictator Creator (HF Router Only)")
 
+# Show user usage count
+my_count = usage_store["users"].get(current_user, {}).get("count", 0)
+st.info(f"Your Usage Count: **{my_count}**")
+st.success(f"Total App Usage: **{usage_store['total_count']}**")
+
+
 HF_ROUTER_BASE = "https://router.huggingface.co/hf-inference/models"
 
-def hf_router_generate_image(model_repo: str, prompt: str, hf_token: str,
-                             width=1024, height=1024, steps=30, guidance=3.5):
 
+def hf_router_generate_image(model_repo, prompt, hf_token,
+                             width=1024, height=1024, steps=30, guidance=3.5):
     if not hf_token:
         return {"type": "error", "data": "[HF_TOKEN missing]"}
 
@@ -141,7 +183,6 @@ def hf_router_generate_image(model_repo: str, prompt: str, hf_token: str,
     except Exception as e:
         return {"type": "error", "data": f"[HF Router request failed: {e}]"}
 
-    # Direct Image
     if resp.status_code == 200 and "image" in resp.headers.get("content-type", ""):
         try:
             img = Image.open(io.BytesIO(resp.content)).convert("RGB")
@@ -149,7 +190,6 @@ def hf_router_generate_image(model_repo: str, prompt: str, hf_token: str,
         except Exception as e:
             return {"type": "error", "data": f"[HF decode failed: {e}]"}
 
-    # JSON fallback
     try:
         data = resp.json()
     except:
@@ -168,17 +208,16 @@ def hf_router_generate_image(model_repo: str, prompt: str, hf_token: str,
 
     return {"type": "error", "data": f"Unsupported response: {data}"}
 
+
 # --------------------------------------
 # UI – Pictator Creator
 # --------------------------------------
-
 st.subheader("Create Engineering Drawing using HF Router Models")
 
 MODELS = {
     "Sketchers (Lineart / Mechanical)": "black-forest-labs/FLUX.1-dev",
     "CAD Drawing XL (2D CNC Blueprints)": "stabilityai/stable-diffusion-xl-base-1.0",
     "RealisticVision (3D)": "stabilityai/stable-diffusion-3-medium-diffusers",
-    
 }
 
 model_choice = st.selectbox("Model", list(MODELS.keys()))
@@ -206,6 +245,12 @@ if st.button("Generate"):
             steps=steps, guidance=guidance
         )
 
+    # Update usage counter
+    if out["type"] == "image":
+        update_usage(current_user, success=True)
+    else:
+        update_usage(current_user, success=False)
+
     if out["type"] == "image":
         img = out["data"]
         st.image(img, caption="Generated Drawing", use_column_width=True)
@@ -213,5 +258,6 @@ if st.button("Generate"):
         buf = io.BytesIO()
         img.save(buf, "PNG")
         st.download_button("Download PNG", buf.getvalue(), "pictator.png")
+
     else:
         st.error(out["data"])
