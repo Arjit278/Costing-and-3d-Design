@@ -250,7 +250,7 @@ steps = st.slider("Inference Steps", 5, 80, 30)
 guidance = st.slider("Guidance Scale", 1.0, 12.0, 3.5)
 
 if st.button("Generate"):
-    with st.spinner("Generating image from HuggingFace Router..."):
+    with st.spinner("Generating image from Pictator HD, 3D enabled..."):
         repo = MODELS[model_choice]
         out = hf_router_generate_image(
             repo, prompt, HF_TOKEN,
