@@ -4,6 +4,7 @@ import requests
 import streamlit as st
 from PIL import Image
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # --------------------------------------
 # 🔧 PAGE CONFIG + DARK THEME + LOGO
@@ -37,14 +38,24 @@ def init_usage_store():
 
 usage_store = init_usage_store()
 
+KOLKATA_TZ = ZoneInfo("Asia/Kolkata")
+
+def now_ist_string():
+    """Return current time string in Asia/Kolkata (IST)."""
+    return datetime.now(KOLKATA_TZ).strftime("%Y-%m-%d %H:%M:%S %Z")
+
 def update_usage(username):
+    """
+    Increment usage counters and record IST timestamp.
+    Only increments total/user count (call only on successful generation or as desired).
+    """
     usage_store["total"] += 1
 
     if username not in usage_store["users"]:
         usage_store["users"][username] = {"count": 0, "last": None}
 
     usage_store["users"][username]["count"] += 1
-    usage_store["users"][username]["last"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    usage_store["users"][username]["last"] = now_ist_string()
 
 # =====================================================================
 # 🔐 USERS LOADED FROM STREAMLIT SECRETS (PERSISTENT)
@@ -71,7 +82,7 @@ if st.session_state.logged_in:
     user = st.session_state.current_user
     if user in usage_store["users"]:
         st.sidebar.info(
-            f"Your Usage Count: **{usage_store['users'][user]['count']}**"
+            f"Your Usage Count: **{usage_store['users'][user]['count']}** (Last: {usage_store['users'][user]['last']})"
         )
 
     if st.sidebar.button("🚪 Logout"):
@@ -126,7 +137,7 @@ if admin_pass == ADMIN_PASSWORD:
     st.sidebar.markdown("### 📌 Paste this back into Streamlit Secrets")
     st.sidebar.code(
         "[users]\n" +
-        "\n".join([f"{u}=\"{p}\"" for u, p in st.session_state.users.items()])
+        "\n".join([f'{u}=\"{p}\"' for u, p in st.session_state.users.items()])
     )
 
     # -------------------------
@@ -248,7 +259,7 @@ if st.button("Generate"):
         )
 
     # ---------------------------------
-    # 🔵 UPDATE USER USAGE COUNTER
+    # 🔵 UPDATE USER USAGE COUNTER (records IST time)
     # ---------------------------------
     update_usage(st.session_state.current_user)
 
