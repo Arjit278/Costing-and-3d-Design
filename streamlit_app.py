@@ -3,6 +3,7 @@ import base64
 import requests
 import streamlit as st
 from PIL import Image
+from datetime import datetime
 
 # --------------------------------------
 # 🔧 PAGE CONFIG + DARK THEME + LOGO
@@ -24,9 +25,30 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --------------------------------------
+# =====================================================================
+# 🔵 GLOBAL USAGE TRACKER (PERSISTENT ON STREAMLIT CLOUD)
+# =====================================================================
+@st.cache_resource
+def init_usage_store():
+    return {
+        "total": 0,
+        "users": {}  # username → {"count": X, "last": timestamp}
+    }
+
+usage_store = init_usage_store()
+
+def update_usage(username):
+    usage_store["total"] += 1
+
+    if username not in usage_store["users"]:
+        usage_store["users"][username] = {"count": 0, "last": None}
+
+    usage_store["users"][username]["count"] += 1
+    usage_store["users"][username]["last"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+# =====================================================================
 # 🔐 USERS LOADED FROM STREAMLIT SECRETS (PERSISTENT)
-# --------------------------------------
+# =====================================================================
 if "users" not in st.session_state:
     st.session_state.users = dict(st.secrets.get("users", {}))
 
@@ -43,15 +65,21 @@ HF_TOKEN_SECRET = st.secrets.get("HF_TOKEN", "")
 # --------------------------------------
 st.sidebar.title("🔐 Login Panel")
 
-# If logged in → show logout
 if st.session_state.logged_in:
     st.sidebar.success(f"Logged in as: {st.session_state.current_user}")
+
+    user = st.session_state.current_user
+    if user in usage_store["users"]:
+        st.sidebar.info(
+            f"Your Usage Count: **{usage_store['users'][user]['count']}**"
+        )
+
     if st.sidebar.button("🚪 Logout"):
         st.session_state.logged_in = False
         st.session_state.current_user = None
         st.rerun()
+
 else:
-    # USER LOGIN FORM
     st.sidebar.subheader("User Login")
     username = st.sidebar.text_input("Username")
     password = st.sidebar.text_input("Password", type="password")
@@ -65,7 +93,7 @@ else:
             st.sidebar.error("❌ Invalid Username or Password")
 
 # --------------------------------------
-# 🔐 ADMIN PANEL (SIDEBAR) – with Secrets Integration
+# 🔐 ADMIN PANEL (SIDEBAR)
 # --------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("🛠 Admin Access")
@@ -101,6 +129,17 @@ if admin_pass == ADMIN_PASSWORD:
         "\n".join([f"{u}=\"{p}\"" for u, p in st.session_state.users.items()])
     )
 
+    # -------------------------
+    # 📊 USAGE STATISTICS
+    # -------------------------
+    st.sidebar.markdown("### 📊 Usage Statistics")
+    st.sidebar.info(f"Total Generations: **{usage_store['total']}**")
+
+    for u, data in usage_store["users"].items():
+        st.sidebar.write(
+            f"**{u}** → {data['count']} (Last: {data['last']})"
+        )
+
 else:
     st.sidebar.info("Admin panel locked")
 
@@ -112,13 +151,10 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# 🎨 TAB 4 – HF ROUTER IMAGE GENERATOR
+# 🎨 HF ROUTER IMAGE GENERATOR ENGINE
 # =====================================================================
 
 HF_TOKEN = HF_TOKEN_SECRET
-
-st.title("🎨 Pictator Creator (HF Router Only)")
-
 HF_ROUTER_BASE = "https://router.huggingface.co/hf-inference/models"
 
 def hf_router_generate_image(model_repo: str, prompt: str, hf_token: str,
@@ -172,9 +208,11 @@ def hf_router_generate_image(model_repo: str, prompt: str, hf_token: str,
 
     return {"type": "error", "data": f"Unsupported response: {data}"}
 
-# --------------------------------------
+# =====================================================================
 # UI – Pictator Creator
-# --------------------------------------
+# =====================================================================
+
+st.title("🎨 Pictator Creator (HF Router Only)")
 
 st.subheader("Create Engineering Drawing using HF Router Models")
 
@@ -208,6 +246,11 @@ if st.button("Generate"):
             width=width, height=height,
             steps=steps, guidance=guidance
         )
+
+    # ---------------------------------
+    # 🔵 UPDATE USER USAGE COUNTER
+    # ---------------------------------
+    update_usage(st.session_state.current_user)
 
     if out["type"] == "image":
         img = out["data"]
