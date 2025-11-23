@@ -18,7 +18,7 @@ st.set_page_config(
 st.markdown(
     """
     <h1 style='text-align:center;color:#00eaff;font-size:45px;'>
-        ⚙️ Pictator Creator – HF Router Edition
+        ⚙️ Pictator Creator – Optimized Automotive 3D Edition
     </h1>
     <h3 style='text-align:center;color:#ffffff;'>Multi-User | Admin Panel | Streamlit Cloud</h3>
     <hr style='border:1px solid #333'>
