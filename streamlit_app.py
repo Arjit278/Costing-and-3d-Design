@@ -1,5 +1,5 @@
 import io
-import base64
+import json
 import requests
 import streamlit as st
 from PIL import Image
@@ -7,7 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 # --------------------------------------
-# 🔧 PAGE CONFIG + THEME + STYLING
+# 🔧 PAGE CONFIG + CYBER-DARK THEME
 # --------------------------------------
 st.set_page_config(
     page_title="Pictator Creator - Automotive 3D Pro",
@@ -18,15 +18,26 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .car-card { border: 2px solid #00eaff; border-radius: 12px; padding: 15px; margin: 10px; background: #1a1c24; box-shadow: 0 4px 15px rgba(0,234,255,0.2); }
-    .label-header { color: #00eaff; font-weight: bold; font-size: 20px; border-bottom: 1px solid #333; margin-bottom: 10px; }
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;700&display=swap');
+    
+    .main { background-color: #0a0b10; color: #ffffff; }
+    h1, h2, h3 { font-family: 'Orbitron', sans-serif !important; color: #00eaff !important; text-transform: uppercase; letter-spacing: 2px; }
+    
+    .car-card { border: 2px solid #00eaff; border-radius: 12px; padding: 15px; margin: 10px; background: #1a1c24; box-shadow: 0 4px 15px rgba(0,234,255,0.2); transition: transform 0.3s ease;}
+    .car-card:hover { transform: translateY(-5px); border-color: #ff00ff; }
+    
+    .label-header { color: #00eaff; font-family: 'Orbitron', sans-serif; font-weight: bold; font-size: 20px; border-bottom: 1px solid #333; margin-bottom: 10px; }
     .meta-label { color: #00eaff; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 8px;}
-    .meta-value { color: #fff; font-size: 14px; margin-bottom: 8px; }
-    .ui-box { border: 2px solid #00eaff; border-radius: 15px; padding: 20px; background: #1a1c24; margin-bottom: 25px; }
-    .spec-header { color: #00eaff; font-size: 14px; font-weight: bold; text-transform: uppercase; margin-top: 10px; }
-    .spec-text { color: #ffffff; font-size: 15px; margin-bottom: 10px; }
+    .meta-value { color: #fff; font-family: 'Inter', sans-serif; font-size: 14px; margin-bottom: 8px; }
+    
+    .ui-box { border: 1px solid #00eaff; border-radius: 15px; padding: 25px; background: linear-gradient(145deg, #13151c, #0a0b10); box-shadow: 0 10px 30px rgba(0, 234, 255, 0.15); margin-top: 30px; }
+    
+    .stButton>button { 
+        background: linear-gradient(90deg, #00eaff, #0072ff); 
+        color: black !important; font-weight: bold; border: none; border-radius: 5px; width: 100%;
+    }
     </style>
-    <h1 style='text-align:center;color:#00eaff;font-size:45px;'>🏎️ Pictator Creator – Automotive 3D Edition</h1>
+    <h1 style='text-align:center;'>🏎️ Pictator Creator – Automotive 3D Edition</h1>
     <h3 style='text-align:center;color:#ffffff;'>Multi-User | Trend Design | Engineering Graphics</h3>
     <hr style='border:1px solid #333'>
     """,
@@ -67,7 +78,6 @@ HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 # SIDEBAR LOGIN & HISTORY
 # --------------------------------------
 st.sidebar.title("🔐 User Dashboard")
-
 if st.session_state.logged_in:
     user = st.session_state.current_user
     st.sidebar.success(f"User: {user}")
@@ -93,12 +103,6 @@ if not st.session_state.logged_in:
 # =====================================================================
 # 🛰️ ENGINES
 # =====================================================================
-OR_MODELS = [
-    "x-ai/grok-4.1-fast:free",
-    "deepseek/deepseek-r1-distill-llama-70b:free",
-    "meta-llama/llama-3.2-3b-instruct:free"
-]
-
 def get_serp_images(query):
     params = {"engine": "google_images", "q": query, "api_key": SERP_API_KEY}
     try:
@@ -115,18 +119,22 @@ def hf_router_generate_image(model_repo, prompt, width=1024, height=1024):
         if resp.status_code == 200:
             return {"type": "image", "data": Image.open(io.BytesIO(resp.content)).convert("RGB")}
     except: return None
-    return {"type": "error", "data": "HF Router Failed"}
 
-def get_openrouter_intel(prompt):
-    for model in OR_MODELS:
-        try:
-            r = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
-                json={"model": model, "messages": [{"role": "user", "content": f"Analyze {prompt} for 2026. Provide technical details for: Brand, Type, Materials, Strength, and Country."}]},
-                timeout=15)
-            if r.status_code == 200: return r.json()["choices"][0]["message"]["content"]
-        except: continue
-    return "2026 Material Trend: High-tensile vegan polymers and carbon-reinforced textures."
+def get_dynamic_specs(prompt):
+    """Parses OpenRouter response into structured technical metadata."""
+    query = f"Provide technical data for: {prompt}. Return a JSON list of 3 objects with keys: Brand, Country, Type, Material, Strength."
+    try:
+        r = requests.post("https://openrouter.ai/api/v1/chat/completions",
+            headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+            json={"model": "deepseek/deepseek-r1-distill-llama-70b:free", "messages": [{"role": "user", "content": query}]}, timeout=15)
+        text = r.json()["choices"][0]["message"]["content"]
+        return json.loads(text[text.find("["):text.rfind("]")+1])
+    except:
+        return [
+            {"Brand": "Elegant Auto", "Country": "India 🇮🇳", "Type": "Luxury Bespoke", "Material": "Nappa Leatherette", "Strength": "High-Durability"},
+            {"Brand": "Tessories", "Country": "Global 🌍", "Type": "Tech-Integrated", "Material": "Vegan Microfiber", "Strength": "Abrasion Resistant"},
+            {"Brand": "Autoform", "Country": "India 🇮🇳", "Type": "Standard Performance", "Material": "PU Dry-Feel", "Strength": "Daily Duty"}
+        ]
 
 # =====================================================================
 # 🎨 MAIN UI
@@ -144,12 +152,11 @@ col_btn1, col_btn2 = st.columns(2)
 
 # --- 📸 ANALYSIS SYSTEM ---
 if col_btn1.button("🔍 Run Trend & Market Analysis"):
-    if not prompt:
-        st.error("Please enter a prompt to analyze.")
+    if not prompt: st.error("Please enter a prompt.")
     else:
         st.markdown("---")
         with st.spinner("Processing Global Intelligence (OpenRouter + Search + HF)..."):
-            tech_specs = get_openrouter_intel(prompt)
+            dynamic_data = get_dynamic_specs(prompt)
             market_data = get_serp_images(f"{prompt} 2026 luxury automotive")
             merged_prompt = f"3-way split comparison. Automotive part design. Left: Premium. Center: Eco. Right: Sport. {prompt}. 8k, photorealistic."
             out_ai = hf_router_generate_image("black-forest-labs/FLUX.1-schnell", merged_prompt, width=1024, height=512)
@@ -157,36 +164,26 @@ if col_btn1.button("🔍 Run Trend & Market Analysis"):
             if out_ai and out_ai["type"] == "image":
                 st.image(out_ai["data"], caption="AI Concept Design Matrix", use_column_width=True)
 
-            # --- RENDER MARKET MATRIX WITH ALL 5 FIELDS ---
+            # --- RENDER MARKET MATRIX ---
             st.markdown("<div class='ui-box'>", unsafe_allow_html=True)
             st.subheader("🔍 Real-World Product Reference & Purchase Links")
             cols = st.columns(3)
-            car_meta = [
-                {"brand": "Elegant Auto", "origin": "India 🇮🇳", "type": "Luxury Bespoke", "mat": "Nappa Leatherette", "strength": "High-Durability"},
-                {"brand": "Tessories", "origin": "Global 🌍", "type": "Tech-Integrated", "mat": "Vegan Microfiber", "strength": "Abrasion Resistant"},
-                {"brand": "Autoform", "origin": "India 🇮🇳", "type": "Standard Performance", "mat": "PU Dry-Feel", "strength": "Daily Duty"}
-            ]
             for i, col in enumerate(cols):
                 with col:
-                    meta = car_meta[i]
-                    st.markdown(f"<div class='label-header'>{meta['brand']}</div>", unsafe_allow_html=True)
+                    entry = dynamic_data[i]
+                    st.markdown(f"<div class='car-card'><div class='label-header'>{entry['Brand']}</div>", unsafe_allow_html=True)
                     if i < len(market_data):
                         st.image(market_data[i]['thumbnail'], use_column_width=True)
                         st.link_button("View Product 🔗", market_data[i]['link'], use_container_width=True)
                     
-                    st.markdown(f"<div class='meta-label'>Country</div><div class='meta-value'>{meta['origin']}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='meta-label'>Part Type</div><div class='meta-value'>{meta['type']}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='meta-label'>Material</div><div class='meta-value'>{meta['mat']}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='meta-label'>Strength</div><div class='meta-value'>{meta['strength']}</div>", unsafe_allow_html=True)
+                    for key in ["Country", "Type", "Material", "Strength"]:
+                        st.markdown(f"<div class='meta-label'>{key}</div><div class='meta-value'>{entry[key]}</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
-
-            st.subheader("📝 OpenRouter Technical Specifications")
-            st.info(tech_specs)
 
 # --- 🚀 FINAL RENDER SYSTEM ---
 if col_btn2.button("🚀 Finalize Engineering Render"):
-    if not prompt:
-        st.error("Please enter a prompt to render.")
+    if not prompt: st.error("Please enter a prompt.")
     else:
         st.markdown("---")
         with st.spinner("Rendering High-Resolution Output..."):
@@ -197,42 +194,18 @@ if col_btn2.button("🚀 Finalize Engineering Render"):
                 buf = io.BytesIO()
                 res["data"].save(buf, format="PNG")
                 st.download_button("💾 Download PNG", buf.getvalue(), "render.png", "image/png")
-                st.success("Generation tracked in your history!")
 
-# --- DYNAMIC FOOTER RESOURCES (Inside the Button Logic) ---
-st.markdown("---")
-st.subheader(f"🌐 Global Trend Inspiration: {prompt[:30]}...")
-
-# Generate Dynamic Queries based on the User Prompt
-dynamic_queries = [
-    {"type": "YouTube", "label": "Latest Trends", "query": f"{prompt} 2026 design trends"},
-    {"type": "Market", "label": "Price Comparison", "query": f"best {prompt} price india 2026"},
-    {"type": "Engineering", "label": "Material Science", "query": f"{prompt} manufacturing material innovations"},
-    {"type": "Global", "label": "International Brands", "query": f"top global brands for {prompt}"}
-]
-
-res_cols = st.columns(4)
-
-for i, res in enumerate(dynamic_queries):
-    # Constructing dynamic URLs
-    if res["type"] == "YouTube":
-        search_url = f"https://www.youtube.com/results?search_query={res['query'].replace(' ', '+')}"
-    else:
-        search_url = f"https://www.google.com/search?q={res['query'].replace(' ', '+')}"
-    
-    with res_cols[i]:
-        st.link_button(
-            f"🔗 {res['type']}: {res['label']}", 
-            search_url, 
-            use_container_width=True,
-            help=f"Search for {res['query']}"
-        )
-
-# Optional: Add a specialized "Deep Dive" link for Material Science
-st.markdown("""
-    <div style='text-align: center; padding: 10px; background-color: #1a1c24; border-radius: 10px; border: 1px dashed #00eaff;'>
-        <p style='margin: 0; font-size: 14px; color: #888;'>
-            💡 <b>Pro Tip:</b> Click the <b>Material Science</b> button to see 2026 strength-to-weight ratio data for this part.
-        </p>
-    </div>
-""", unsafe_allow_html=True)
+# --- DYNAMIC FOOTER RESOURCES ---
+if prompt:
+    st.markdown("---")
+    st.subheader(f"🌐 Global Trend Inspiration: {prompt[:30]}...")
+    dynamic_queries = [
+        {"type": "YouTube", "label": "Latest Trends", "query": f"{prompt} 2026 design trends"},
+        {"type": "Market", "label": "Price Comparison", "query": f"best {prompt} price india 2026"},
+        {"type": "Engineering", "label": "Material Science", "query": f"{prompt} manufacturing material innovations"},
+        {"type": "Global", "label": "International Brands", "query": f"top global brands for {prompt}"}
+    ]
+    res_cols = st.columns(4)
+    for i, res in enumerate(dynamic_queries):
+        search_url = f"https://www.youtube.com/results?search_query={res['query'].replace(' ', '+')}" if res["type"] == "YouTube" else f"https://www.google.com/search?q={res['query'].replace(' ', '+')}"
+        res_cols[i].link_button(f"🔗 {res['type']}: {res['label']}", search_url, use_container_width=True)
