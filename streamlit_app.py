@@ -31,14 +31,16 @@ st.markdown(
     .meta-value { color: #fff; font-family: 'Inter', sans-serif; font-size: 14px; margin-bottom: 8px; }
     
     .ui-box { border: 1px solid #00eaff; border-radius: 15px; padding: 25px; background: linear-gradient(145deg, #13151c, #0a0b10); box-shadow: 0 10px 30px rgba(0, 234, 255, 0.15); margin-top: 30px; }
+    .rca-box { border-left: 5px solid #ff00ff; padding-left: 20px; background: rgba(255, 0, 255, 0.05); border-radius: 0 15px 15px 0; margin-bottom: 25px; }
     
     .stButton>button { 
         background: linear-gradient(90deg, #00eaff, #0072ff); 
-        color: black !important; font-weight: bold; border: none; border-radius: 5px; width: 100%;
+        color: black !important; font-weight: bold; border: none; border-radius: 5px; width: 100%; height: 50px;
     }
+    .stTextArea textarea { background-color: #13151c !important; color: #00eaff !important; border: 1px solid #00eaff !important; }
     </style>
-    <h1 style='text-align:center;'>🏎️ Pictator Creator – Automotive 3D Edition</h1>
-    <h3 style='text-align:center;color:#ffffff;'>Multi-User | Trend Design | Engineering Graphics</h3>
+    <h1 style='text-align:center;'>🏎️ Pictator Pro – CEO Engineering Suite</h1>
+    <h3 style='text-align:center;color:#ffffff;'>Strategic RCA | Trend Design | Engineering Graphics</h3>
     <hr style='border:1px solid #333'>
     """,
     unsafe_allow_html=True,
@@ -120,6 +122,23 @@ def hf_router_generate_image(model_repo, prompt, width=1024, height=1024):
             return {"type": "image", "data": Image.open(io.BytesIO(resp.content)).convert("RGB")}
     except: return None
 
+def get_ceo_rca_analysis(topic):
+    """Generates CEO-level RCA reasoning."""
+    query = f"""
+    Perform a CEO-level Root Cause Analysis (RCA) for: {topic}.
+    Use Engineering Science (Physics, Stress, Chemistry), Material Science, and 2026 Industry Evidence.
+    Structure the response for Board Review:
+    1. Technical Fault Mechanism (Deep Physics/Chemistry)
+    2. Material Degradation Lifecycle
+    3. Strategic Financial & Safety Impact
+    """
+    try:
+        r = requests.post("https://openrouter.ai/api/v1/chat/completions",
+            headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+            json={"model": "deepseek/deepseek-r1-distill-llama-70b:free", "messages": [{"role": "user", "content": query}]}, timeout=25)
+        return r.json()["choices"][0]["message"]["content"]
+    except: return "Deep Analysis Unavailable. Manual Audit Required."
+
 def get_dynamic_specs(prompt):
     """Parses OpenRouter response into structured technical metadata."""
     query = f"Provide technical data for: {prompt}. Return a JSON list of 3 objects with keys: Brand, Country, Type, Material, Strength."
@@ -146,27 +165,36 @@ MODELS = {
 }
 
 model_choice = st.selectbox("Select Model Engine", list(MODELS.keys()))
-prompt = st.text_area("Engineering / Design Prompt", placeholder="e.g. Nappa leather seat covers for BMW i7, diamond stitching...")
+prompt = st.text_area("CEO Engineering Prompt / RCA Topic", placeholder="e.g. Failure of Nappa Leatherette under high thermal stress in Indian climates...")
 
 col_btn1, col_btn2 = st.columns(2)
 
-# --- 📸 ANALYSIS SYSTEM ---
-if col_btn1.button("🔍 Run Trend & Market Analysis"):
-    if not prompt: st.error("Please enter a prompt.")
+# --- 📸 STRATEGIC ANALYSIS SYSTEM ---
+if col_btn1.button("🔍 Run Strategic RCA & Market Analysis"):
+    if not prompt: st.error("Please enter a technical topic.")
     else:
         st.markdown("---")
-        with st.spinner("Processing Global Intelligence (OpenRouter + Search + HF)..."):
+        with st.spinner("Executing CEO-Level Root Cause Analysis..."):
+            # Execute RCA and Market Intelligence
+            rca_intel = get_ceo_rca_analysis(prompt)
             dynamic_data = get_dynamic_specs(prompt)
-            market_data = get_serp_images(f"{prompt} 2026 luxury automotive")
-            merged_prompt = f"3-way split comparison. Automotive part design. Left: Premium. Center: Eco. Right: Sport. {prompt}. 8k, photorealistic."
+            market_data = get_serp_images(f"{prompt} 2026 industrial photography")
+            merged_prompt = f"3-way split comparison. Automotive technical design. Left: Luxury. Center: Tech. Right: Industrial. {prompt}. 8k, photorealistic."
             out_ai = hf_router_generate_image("black-forest-labs/FLUX.1-schnell", merged_prompt, width=1024, height=512)
 
-            if out_ai and out_ai["type"] == "image":
-                st.image(out_ai["data"], caption="AI Concept Design Matrix", use_column_width=True)
+            # 1. RCA Results
+            st.markdown("<div class='ui-box rca-box'>", unsafe_allow_html=True)
+            st.markdown("<h2 style='color:#ff00ff !important;'>Strategic Root Cause Analysis (RCA)</h2>", unsafe_allow_html=True)
+            st.markdown(rca_intel)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-            # --- RENDER MARKET MATRIX ---
+            # 2. AI Visuals
+            if out_ai and out_ai["type"] == "image":
+                st.image(out_ai["data"], caption="AI Engineering Concept Design", use_column_width=True)
+
+            # 3. Market Matrix
             st.markdown("<div class='ui-box'>", unsafe_allow_html=True)
-            st.subheader("🔍 Real-World Product Reference & Purchase Links")
+            st.subheader("📊 Engineering Reference & Procurement Links")
             cols = st.columns(3)
             for i, col in enumerate(cols):
                 with col:
@@ -174,7 +202,7 @@ if col_btn1.button("🔍 Run Trend & Market Analysis"):
                     st.markdown(f"<div class='car-card'><div class='label-header'>{entry['Brand']}</div>", unsafe_allow_html=True)
                     if i < len(market_data):
                         st.image(market_data[i]['thumbnail'], use_column_width=True)
-                        st.link_button("View Product 🔗", market_data[i]['link'], use_container_width=True)
+                        st.link_button("View Intelligence 🔗", market_data[i]['link'], use_container_width=True)
                     
                     for key in ["Country", "Type", "Material", "Strength"]:
                         st.markdown(f"<div class='meta-label'>{key}</div><div class='meta-value'>{entry[key]}</div>", unsafe_allow_html=True)
@@ -193,19 +221,19 @@ if col_btn2.button("🚀 Finalize Engineering Render"):
                 st.image(res["data"], caption="Final Rendered Output", use_column_width=True)
                 buf = io.BytesIO()
                 res["data"].save(buf, format="PNG")
-                st.download_button("💾 Download PNG", buf.getvalue(), "render.png", "image/png")
+                st.download_button("💾 Download PNG", buf.getvalue(), "render_output.png", "image/png")
 
 # --- DYNAMIC FOOTER RESOURCES ---
 if prompt:
     st.markdown("---")
-    st.subheader(f"🌐 Global Trend Inspiration: {prompt[:30]}...")
+    st.subheader(f"🌐 Intelligence Hub: {prompt[:40]}")
     dynamic_queries = [
-        {"type": "YouTube", "label": "Latest Trends", "query": f"{prompt} 2026 design trends"},
-        {"type": "Market", "label": "Price Comparison", "query": f"best {prompt} price india 2026"},
-        {"type": "Engineering", "label": "Material Science", "query": f"{prompt} manufacturing material innovations"},
-        {"type": "Global", "label": "International Brands", "query": f"top global brands for {prompt}"}
+        {"type": "YouTube", "label": "Engineering Trends", "query": f"{prompt} 2026 design trends"},
+        {"type": "Market", "label": "Price Comparison", "query": f"best {prompt} cost 2026 india"},
+        {"type": "Engineering", "label": "Material Science", "query": f"{prompt} chemical material innovations"},
+        {"type": "Global", "label": "Strategic Brands", "query": f"top global competitors for {prompt}"}
     ]
     res_cols = st.columns(4)
     for i, res in enumerate(dynamic_queries):
         search_url = f"https://www.youtube.com/results?search_query={res['query'].replace(' ', '+')}" if res["type"] == "YouTube" else f"https://www.google.com/search?q={res['query'].replace(' ', '+')}"
-        res_cols[i].link_button(f"🔗 {res['type']}: {res['label']}", search_url, use_container_width=True)
+        res_cols[i].link_button(f"🔗 {res['label']}", search_url, use_container_width=True)
