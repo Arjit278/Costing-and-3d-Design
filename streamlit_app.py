@@ -21,7 +21,7 @@ st.caption("Strategic Parallel RCA | Multithreaded Design | 2026 Material Intel"
 if "count" not in st.session_state:
     st.session_state.count = 0
 
-# ✅ SIDEBAR (UNCHANGED POSITION - LEFT PANEL)
+# ✅ SIDEBAR (UNCHANGED)
 st.sidebar.title("🔐 Control Panel")
 st.sidebar.metric("🖼️ Images Generated", st.session_state.count)
 st.sidebar.markdown("---")
@@ -35,10 +35,10 @@ class AnalysisResults:
         self.specs_raw = None
         self.market_photos = []
         self.ai_concept = None
-        self.rca_status = "OK"   # ✅ NEW
+        self.rca_status = "OK"
 
 # --------------------------------------
-# API CONFIG (⚠️ Move to secrets later)
+# API CONFIG
 # --------------------------------------
 OPENROUTER_API_KEY = "YOUR_KEY"
 SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
@@ -51,7 +51,7 @@ MODELS = [
 ]
 
 # --------------------------------------
-# 🔥 OPENROUTER FIXED ENGINE (WITH ERROR RETURN)
+# 🔥 OPENROUTER ENGINE
 # --------------------------------------
 def call_openrouter(prompt):
     headers = {
@@ -80,7 +80,6 @@ def call_openrouter(prompt):
                     content = data.get("choices", [{}])[0].get("message", {}).get("content")
                     if content:
                         return content.strip(), "OK"
-
                 else:
                     last_error = f"HTTP {r.status_code}"
 
@@ -96,31 +95,19 @@ def hf_gen_image(prompt):
     try:
         url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
         headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-
         r = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=60)
         return Image.open(io.BytesIO(r.content)).convert("RGB")
     except:
         return None
 
 # --------------------------------------
-# THREAD FUNCTIONS (SAFE)
+# THREADS
 # --------------------------------------
 def thread_rca(res, prompt):
     try:
-        output, status = call_openrouter(
-            f"""
-            Perform CEO-level Root Cause Analysis:
-            {prompt}
-
-            Focus:
-            - Material science
-            - European manufacturing
-            - 2026 innovations
-            - Engineering logic
-            """
-        )
+        output, status = call_openrouter(f"Current automotive material and design trends: {prompt}")
         res.rca_intel = output
-        res.rca_status = status   # ✅ STORE FAILURE REASON
+        res.rca_status = status
     except Exception as e:
         res.rca_intel = None
         res.rca_status = str(e)
@@ -130,10 +117,19 @@ def thread_meta(res, prompt):
     try:
         result = call_openrouter(
             f"""
-            Return ONLY JSON list of 3 automotive seat cover variations in Europe.
+            Generate 3 automotive seat/material specs with car models.
 
-            Keys:
-            Brand, Country, Type, Material, Strength
+            Return JSON:
+            [
+              {{
+                "Brand": "",
+                "Vehicle": "",
+                "Country": "",
+                "Type": "",
+                "Material": "",
+                "Strength": ""
+              }}
+            ]
 
             Topic: {prompt}
             """
@@ -164,7 +160,7 @@ prompt = st.text_area("Enter Topic")
 col1, col2 = st.columns(2)
 
 # --------------------------------------
-# 🚀 MAIN EXECUTION
+# 🚀 EXECUTION
 # --------------------------------------
 if col1.button("🚀 EXECUTE"):
     if not prompt:
@@ -186,33 +182,32 @@ if col1.button("🚀 EXECUTE"):
             t3.join(timeout=35)
 
         # --------------------------------------
-        # 🧠 RCA FALLBACK + ERROR DISPLAY
+        # CURRENT TRENDS
         # --------------------------------------
         if not res.rca_intel:
             st.warning(f"⚠️ Primary Engine Failed: {res.rca_status}")
-
-            res.rca_intel = f"""
-Fallback Strategic RCA:
+            res.rca_intel = """
+Current Trends Insight:
 
 • Hybrid leather (Nappa + Alcantara) dominates EU market  
-• Laser perforation for cooling + ventilation  
-• Ergonomic stitching (diamond / ribbed)  
-• Shift toward sustainable leather processing  
-• Modular seat cover customization rising  
+• Laser perforation for cooling  
+• Ergonomic stitching  
+• Sustainable materials  
+• Modular customization  
 """
 
-        st.subheader("📊 RCA")
+        st.subheader("📊 Current Trends")
         st.write(res.rca_intel)
 
         # --------------------------------------
-        # 🎨 IMAGE + COUNTER FIX
+        # IMAGE + COUNTER
         # --------------------------------------
         if res.ai_concept:
             st.image(res.ai_concept)
-            st.session_state.count += 1   # ✅ COUNTER FIX
+            st.session_state.count += 1
 
         # --------------------------------------
-        # 🔍 SPEC FIX
+        # AI-DRIVEN SPECS WITH VEHICLE
         # --------------------------------------
         specs = []
         try:
@@ -222,11 +217,12 @@ Fallback Strategic RCA:
         except:
             specs = []
 
+        # FINAL FALLBACK (WITH VEHICLE)
         if not specs:
             specs = [
-                {"Brand": "Germany Tech", "Country": "Germany", "Type": "Performance", "Material": "Carbon Leather", "Strength": "Industrial"},
-                {"Brand": "Italy Lux", "Country": "Italy", "Type": "Luxury", "Material": "Nappa Leather", "Strength": "Premium"},
-                {"Brand": "France Eco", "Country": "France", "Type": "Eco", "Material": "Bio Leather", "Strength": "Sustainable"},
+                {"Brand": "BMW Interior Systems", "Vehicle": "BMW 7 Series", "Country": "Germany", "Type": "Performance", "Material": "Nappa Leather", "Strength": "High Durability"},
+                {"Brand": "Ferrari Design Lab", "Vehicle": "Ferrari Roma", "Country": "Italy", "Type": "Luxury", "Material": "Alcantara + Leather", "Strength": "Premium"},
+                {"Brand": "Renault EcoTech", "Vehicle": "Renault Megane E-Tech", "Country": "France", "Type": "Eco", "Material": "Bio Leather", "Strength": "Sustainable"},
             ]
 
         st.subheader("🔍 Technical Specs")
@@ -236,18 +232,20 @@ Fallback Strategic RCA:
             d = specs[i % len(specs)]
             with col:
                 st.markdown(f"### {d.get('Brand')}")
+                st.write(f"**Vehicle:** {d.get('Vehicle')}")
                 for k, v in d.items():
-                    st.write(f"**{k}:** {v}")
+                    if k != "Vehicle":
+                        st.write(f"**{k}:** {v}")
 
                 if i < len(res.market_photos):
                     st.image(res.market_photos[i]["thumbnail"])
 
 # --------------------------------------
-# 🎨 RENDER BUTTON
+# 🎨 RENDER
 # --------------------------------------
 if col2.button("🎨 RENDER"):
     if prompt:
         img = hf_gen_image(f"{prompt}, ultra realistic, 8k")
         if img:
             st.image(img)
-            st.session_state.count += 1   # ✅ COUNTER
+            st.session_state.count += 1
