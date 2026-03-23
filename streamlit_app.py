@@ -323,10 +323,87 @@ prompt = st.text_area(
     "technical CNC blueprint, mechanical disc brake, top view, thin black engineering lineart"
 )
 
+# ✅ START PASTE HERE
+if prompt and (
+    "design" in prompt.lower()
+    or "reference" in prompt.lower()
+    or "photograph" in prompt.lower()
+):
+
+    st.markdown("### 📸 AI Trend-Based Design (Global Market)")
+
+    import requests
+
+    OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
+
+    trend_text = "modern automotive component designs"
+
+    if OPENROUTER_API_KEY:
+        try:
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "openai/gpt-4o-mini",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": "List 3 latest automotive design trends (2025-2026) with car name and country."
+                        }
+                    ]
+                },
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                trend_text = response.json()["choices"][0]["message"]["content"]
+
+        except:
+            trend_text = "German EV brake, Japanese hybrid precision, American performance system"
+
+    merged_prompt = f"""
+    Create a single wide image divided into 3 sections:
+
+    LEFT: Germany automotive design (label car + country)
+    CENTER: Japan automotive design (label car + country)
+    RIGHT: USA automotive design (label car + country)
+
+    Style: futuristic, 3D render, engineering, labeled
+
+    Trends:
+    {trend_text}
+    """
+
+    with st.spinner("Generating AI Trend Design..."):
+        out = hf_router_generate_image(
+            "stabilityai/stable-diffusion-3-medium-diffusers",
+            merged_prompt,
+            HF_TOKEN,
+            width=1024,
+            height=512,
+            steps=30,
+            guidance=4.0
+        )
+
+    if out["type"] == "image":
+        st.image(out["data"], caption="AI Trend Design", use_column_width=True)
+    else:
+        st.warning("Fallback preview shown")
+# ✅ END BLOCK
+
+col1, col2 = st.columns(2)
+
 # --------------------------------------
 # 📸 AI TREND DESIGN PREVIEW (MERGED IMAGE)
 # --------------------------------------
-if "design" in prompt.lower() or "reference" in prompt.lower() or "photograph" in prompt.lower():
+if prompt and (
+    "design" in prompt.lower()
+    or "reference" in prompt.lower()
+    or "photograph" in prompt.lower()
+):
     
 col1, col2 = st.columns(2)
 with col1:
