@@ -20,7 +20,7 @@ st.markdown(
     <style>
     .car-card { border: 2px solid #00eaff; border-radius: 12px; padding: 15px; margin: 10px; background: #1a1c24; box-shadow: 0 4px 15px rgba(0,234,255,0.2); }
     .label-header { color: #00eaff; font-weight: bold; font-size: 20px; border-bottom: 1px solid #333; margin-bottom: 10px; }
-    .meta-label { color: #888; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .meta-label { color: #00eaff; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 8px;}
     .meta-value { color: #fff; font-size: 14px; margin-bottom: 8px; }
     .ui-box { border: 2px solid #00eaff; border-radius: 15px; padding: 20px; background: #1a1c24; margin-bottom: 25px; }
     .spec-header { color: #00eaff; font-size: 14px; font-weight: bold; text-transform: uppercase; margin-top: 10px; }
@@ -122,11 +122,11 @@ def get_openrouter_intel(prompt):
         try:
             r = requests.post("https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
-                json={"model": model, "messages": [{"role": "user", "content": f"Provide technical 2026 specs for {prompt}. Include Material, Brand, and Tier."}]},
+                json={"model": model, "messages": [{"role": "user", "content": f"Analyze {prompt} for 2026. Provide technical details for: Brand, Type, Materials, Strength, and Country."}]},
                 timeout=15)
             if r.status_code == 200: return r.json()["choices"][0]["message"]["content"]
         except: continue
-    return "Standard 2026 Automotive Trends: Lightweight Composites and Bio-Based Textures."
+    return "2026 Material Trend: High-tensile vegan polymers and carbon-reinforced textures."
 
 # =====================================================================
 # 🎨 MAIN UI
@@ -138,7 +138,6 @@ MODELS = {
 }
 
 model_choice = st.selectbox("Select Model Engine", list(MODELS.keys()))
-# Prompt is blank by default
 prompt = st.text_area("Engineering / Design Prompt", placeholder="e.g. Nappa leather seat covers for BMW i7, diamond stitching...")
 
 col_btn1, col_btn2 = st.columns(2)
@@ -149,38 +148,38 @@ if col_btn1.button("🔍 Run Trend & Market Analysis"):
         st.error("Please enter a prompt to analyze.")
     else:
         st.markdown("---")
-        with st.spinner("Simultaneous Intelligence Processing (OpenRouter + Search + HF)..."):
-            # Execute all three simultaneously
+        with st.spinner("Processing Global Intelligence (OpenRouter + Search + HF)..."):
             tech_specs = get_openrouter_intel(prompt)
-            market_data = get_serp_images(f"{prompt} 2026 luxury price")
-            merged_prompt = f"Automotive part photography comparison. Left: Premium. Center: Modern. Right: Performance. {prompt}. 8k, realistic."
+            market_data = get_serp_images(f"{prompt} 2026 luxury automotive")
+            merged_prompt = f"3-way split comparison. Automotive part design. Left: Premium. Center: Eco. Right: Sport. {prompt}. 8k, photorealistic."
             out_ai = hf_router_generate_image("black-forest-labs/FLUX.1-schnell", merged_prompt, width=1024, height=512)
 
-            # Display HF AI Comparison
             if out_ai and out_ai["type"] == "image":
                 st.image(out_ai["data"], caption="AI Concept Design Matrix", use_column_width=True)
 
-            # Display Market Matrix (UI Boxes)
+            # --- RENDER MARKET MATRIX WITH ALL 5 FIELDS ---
             st.markdown("<div class='ui-box'>", unsafe_allow_html=True)
             st.subheader("🔍 Real-World Product Reference & Purchase Links")
             cols = st.columns(3)
             car_meta = [
-                {"name": "Elegant Auto", "origin": "India 🇮🇳", "mat": "Nappa Leatherette", "tier": "Premium"},
-                {"name": "Tessories", "origin": "Global 🌍", "mat": "Vegan Microfiber", "tier": "High-Tech"},
-                {"name": "Autoform", "origin": "India 🇮🇳", "mat": "PU Dry-Feel", "tier": "Economy Plus"}
+                {"brand": "Elegant Auto", "origin": "India 🇮🇳", "type": "Luxury Bespoke", "mat": "Nappa Leatherette", "strength": "High-Durability"},
+                {"brand": "Tessories", "origin": "Global 🌍", "type": "Tech-Integrated", "mat": "Vegan Microfiber", "strength": "Abrasion Resistant"},
+                {"brand": "Autoform", "origin": "India 🇮🇳", "type": "Standard Performance", "mat": "PU Dry-Feel", "strength": "Daily Duty"}
             ]
             for i, col in enumerate(cols):
                 with col:
                     meta = car_meta[i]
-                    st.markdown(f"**{meta['name']}**")
-                    st.caption(f"{meta['origin']} | {meta['tier']}")
+                    st.markdown(f"<div class='label-header'>{meta['brand']}</div>", unsafe_allow_html=True)
                     if i < len(market_data):
                         st.image(market_data[i]['thumbnail'], use_column_width=True)
                         st.link_button("View Product 🔗", market_data[i]['link'], use_container_width=True)
+                    
+                    st.markdown(f"<div class='meta-label'>Country</div><div class='meta-value'>{meta['origin']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='meta-label'>Part Type</div><div class='meta-value'>{meta['type']}</div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='meta-label'>Material</div><div class='meta-value'>{meta['mat']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='meta-label'>Strength</div><div class='meta-value'>{meta['strength']}</div>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-            # Display OpenRouter Specs
             st.subheader("📝 OpenRouter Technical Specifications")
             st.info(tech_specs)
 
@@ -190,7 +189,7 @@ if col_btn2.button("🚀 Finalize Engineering Render"):
         st.error("Please enter a prompt to render.")
     else:
         st.markdown("---")
-        with st.spinner("Rendering High-Resolution 3D Output..."):
+        with st.spinner("Rendering High-Resolution Output..."):
             res = hf_router_generate_image(MODELS[model_choice], prompt)
             if res and res["type"] == "image":
                 update_usage(st.session_state.current_user)
@@ -200,15 +199,40 @@ if col_btn2.button("🚀 Finalize Engineering Render"):
                 st.download_button("💾 Download PNG", buf.getvalue(), "render.png", "image/png")
                 st.success("Generation tracked in your history!")
 
-# --- FOOTER RESOURCES ---
+# --- DYNAMIC FOOTER RESOURCES (Inside the Button Logic) ---
 st.markdown("---")
-st.subheader("🌐 Global Trend Inspiration")
-res_cols = st.columns(4)
-resources = [
-    {"title": "Luxury Interiors 2026", "url": "https://www.youtube.com/results?search_query=luxury+car+interiors+2026+trends", "type": "YouTube"},
-    {"title": "German Engineering Design", "url": "https://www.bmw.com/en/design.html", "type": "Website"},
-    {"title": "Tesla Accessory Trends", "url": "https://www.tesla.com/shop", "type": "Website"},
-    {"title": "Material Science Innovations", "url": "https://www.dezeen.com/tag/automotive-design/", "type": "Web Journal"}
+st.subheader(f"🌐 Global Trend Inspiration: {prompt[:30]}...")
+
+# Generate Dynamic Queries based on the User Prompt
+dynamic_queries = [
+    {"type": "YouTube", "label": "Latest Trends", "query": f"{prompt} 2026 design trends"},
+    {"type": "Market", "label": "Price Comparison", "query": f"best {prompt} price india 2026"},
+    {"type": "Engineering", "label": "Material Science", "query": f"{prompt} manufacturing material innovations"},
+    {"type": "Global", "label": "International Brands", "query": f"top global brands for {prompt}"}
 ]
-for i, r_col in enumerate(res_cols):
-    r_col.link_button(f"{resources[i]['type']}: {resources[i]['title']}", resources[i]['url'], use_container_width=True)
+
+res_cols = st.columns(4)
+
+for i, res in enumerate(dynamic_queries):
+    # Constructing dynamic URLs
+    if res["type"] == "YouTube":
+        search_url = f"https://www.youtube.com/results?search_query={res['query'].replace(' ', '+')}"
+    else:
+        search_url = f"https://www.google.com/search?q={res['query'].replace(' ', '+')}"
+    
+    with res_cols[i]:
+        st.link_button(
+            f"🔗 {res['type']}: {res['label']}", 
+            search_url, 
+            use_container_width=True,
+            help=f"Search for {res['query']}"
+        )
+
+# Optional: Add a specialized "Deep Dive" link for Material Science
+st.markdown("""
+    <div style='text-align: center; padding: 10px; background-color: #1a1c24; border-radius: 10px; border: 1px dashed #00eaff;'>
+        <p style='margin: 0; font-size: 14px; color: #888;'>
+            💡 <b>Pro Tip:</b> Click the <b>Material Science</b> button to see 2026 strength-to-weight ratio data for this part.
+        </p>
+    </div>
+""", unsafe_allow_html=True)
