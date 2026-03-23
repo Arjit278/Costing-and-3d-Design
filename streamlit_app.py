@@ -332,8 +332,6 @@ if prompt and (
 
     st.markdown("### 📸 AI Trend-Based Design (Global Market)")
 
-    import requests
-
     OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
 
     trend_text = "modern automotive component designs"
@@ -360,8 +358,10 @@ if prompt and (
 
             if response.status_code == 200:
                 trend_text = response.json()["choices"][0]["message"]["content"]
+            else:
+                trend_text = "German EV brake, Japanese hybrid precision, American performance system"
 
-        except:
+        except Exception as e:
             trend_text = "German EV brake, Japanese hybrid precision, American performance system"
 
     merged_prompt = f"""
@@ -391,7 +391,8 @@ if prompt and (
     if out["type"] == "image":
         st.image(out["data"], caption="AI Trend Design", use_column_width=True)
     else:
-        st.warning("Fallback preview shown")
+        st.warning("⚠️ AI generation failed — showing fallback preview")
+        st.write(trend_text)
 # ✅ END BLOCK
 
 col1, col2 = st.columns(2)
