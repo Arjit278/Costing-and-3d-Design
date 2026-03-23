@@ -314,16 +314,6 @@ if prompt and (
 
 col1, col2 = st.columns(2)
 
-# --------------------------------------
-# 📸 AI TREND DESIGN PREVIEW (MERGED IMAGE)
-# --------------------------------------
-if prompt and (
-    "design" in prompt.lower()
-    or "reference" in prompt.lower()
-    or "photograph" in prompt.lower()
-):
-    
-col1, col2 = st.columns(2)
 with col1:
     width = st.number_input("Width", 256, 1536, 768)
 with col2:
