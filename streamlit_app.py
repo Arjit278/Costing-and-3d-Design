@@ -227,6 +227,94 @@ st.title("🎨 Pictator Creator (HF Router Only)")
 
 st.subheader("Create Engineering Drawing using HF Router Models")
 
+# --------------------------------------
+# 📸 AI TREND DESIGN PREVIEW (MERGED IMAGE)
+# --------------------------------------
+if "design" in prompt.lower() or "reference" in prompt.lower() or "photograph" in prompt.lower():
+
+    st.markdown("### 📸 AI Trend-Based Design (Global Market)")
+
+    import requests
+
+    # --------------------------------------
+    # 🔵 STEP 1: GET TRENDY DESIGNS (OPENROUTER)
+    # --------------------------------------
+    OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
+
+    trend_text = "modern automotive component designs"
+
+    if OPENROUTER_API_KEY:
+        try:
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "openai/gpt-4o-mini",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": f"List 3 latest automotive design trends (2025-2026) with car name and country. Keep it short."
+                        }
+                    ]
+                },
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                trend_text = response.json()["choices"][0]["message"]["content"]
+
+        except Exception as e:
+            trend_text = "modern German EV brake design, Japanese hybrid precision component, American performance automotive system"
+
+    # --------------------------------------
+    # 🔵 STEP 2: CREATE MERGED IMAGE PROMPT
+    # --------------------------------------
+    merged_prompt = f"""
+    Create a single wide image divided into 3 sections (left, center, right):
+
+    LEFT: Latest automotive design from Germany (label with car name and country)
+    CENTER: Latest automotive design from Japan (label with car name and country)
+    RIGHT: Latest automotive design from USA (label with car name and country)
+
+    Style: futuristic, 3D render, engineering precision, high detail, clean background, labeled sections
+
+    Trends:
+    {trend_text}
+    """
+
+    # --------------------------------------
+    # 🔵 STEP 3: GENERATE IMAGE (HF ROUTER)
+    # --------------------------------------
+    with st.spinner("Generating AI Trend Design..."):
+        repo = "stabilityai/stable-diffusion-3-medium-diffusers"
+
+        out = hf_router_generate_image(
+            repo,
+            merged_prompt,
+            HF_TOKEN,
+            width=1024,
+            height=512,
+            steps=30,
+            guidance=4.0
+        )
+
+    # --------------------------------------
+    # 🔵 STEP 4: DISPLAY OUTPUT
+    # --------------------------------------
+    if out["type"] == "image":
+        st.image(out["data"], caption="Global Automotive Design Trends (AI Generated)", use_column_width=True)
+    else:
+        st.warning("⚠️ Trend preview fallback used")
+
+        st.image(
+            "https://images.unsplash.com/photo-1581092160607-ee22731d1d5f",
+            caption="Fallback Design Preview",
+            use_column_width=True
+        )
+
 MODELS = {
     "Sketchers (Lineart / Mechanical)": "black-forest-labs/FLUX.1-dev",
     "CAD Drawing XL (2D CNC Blueprints)": "stabilityai/stable-diffusion-xl-base-1.0",
