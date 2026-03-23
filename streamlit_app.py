@@ -21,6 +21,11 @@ st.caption("Strategic Parallel RCA | Multithreaded Design | 2026 Material Intel"
 if "count" not in st.session_state:
     st.session_state.count = 0
 
+# ✅ SIDEBAR (UNCHANGED POSITION - LEFT PANEL)
+st.sidebar.title("🔐 Control Panel")
+st.sidebar.metric("🖼️ Images Generated", st.session_state.count)
+st.sidebar.markdown("---")
+
 # --------------------------------------
 # RESULT CONTAINER
 # --------------------------------------
@@ -30,6 +35,7 @@ class AnalysisResults:
         self.specs_raw = None
         self.market_photos = []
         self.ai_concept = None
+        self.rca_status = "OK"   # ✅ NEW
 
 # --------------------------------------
 # API CONFIG (⚠️ Move to secrets later)
@@ -45,7 +51,7 @@ MODELS = [
 ]
 
 # --------------------------------------
-# 🔥 OPENROUTER FIXED ENGINE
+# 🔥 OPENROUTER FIXED ENGINE (WITH ERROR RETURN)
 # --------------------------------------
 def call_openrouter(prompt):
     headers = {
@@ -53,8 +59,10 @@ def call_openrouter(prompt):
         "Content-Type": "application/json"
     }
 
+    last_error = None
+
     for model in MODELS:
-        for attempt in range(2):  # retry logic
+        for attempt in range(2):
             try:
                 r = requests.post(
                     "https://openrouter.ai/api/v1/chat/completions",
@@ -71,13 +79,15 @@ def call_openrouter(prompt):
                     data = r.json()
                     content = data.get("choices", [{}])[0].get("message", {}).get("content")
                     if content:
-                        return content.strip()
+                        return content.strip(), "OK"
+
+                else:
+                    last_error = f"HTTP {r.status_code}"
 
             except Exception as e:
-                print(f"[ERROR] {model} attempt {attempt}: {e}")
+                last_error = str(e)
 
-    return None  # important change
-
+    return None, last_error or "Timeout"
 
 # --------------------------------------
 # IMAGE ENGINE
@@ -92,13 +102,12 @@ def hf_gen_image(prompt):
     except:
         return None
 
-
 # --------------------------------------
 # THREAD FUNCTIONS (SAFE)
 # --------------------------------------
 def thread_rca(res, prompt):
     try:
-        res.rca_intel = call_openrouter(
+        output, status = call_openrouter(
             f"""
             Perform CEO-level Root Cause Analysis:
             {prompt}
@@ -110,13 +119,16 @@ def thread_rca(res, prompt):
             - Engineering logic
             """
         )
-    except:
+        res.rca_intel = output
+        res.rca_status = status   # ✅ STORE FAILURE REASON
+    except Exception as e:
         res.rca_intel = None
+        res.rca_status = str(e)
 
 
 def thread_meta(res, prompt):
     try:
-        res.specs_raw = call_openrouter(
+        result = call_openrouter(
             f"""
             Return ONLY JSON list of 3 automotive seat cover variations in Europe.
 
@@ -126,6 +138,7 @@ def thread_meta(res, prompt):
             Topic: {prompt}
             """
         )
+        res.specs_raw = result[0] if result else None
     except:
         res.specs_raw = None
 
@@ -143,7 +156,6 @@ def thread_assets(res, prompt):
 
     res.ai_concept = hf_gen_image(f"{prompt}, automotive engineering diagram")
 
-
 # --------------------------------------
 # UI INPUT
 # --------------------------------------
@@ -152,7 +164,7 @@ prompt = st.text_area("Enter Topic")
 col1, col2 = st.columns(2)
 
 # --------------------------------------
-# 🚀 MAIN EXECUTION (FIXED THREADING)
+# 🚀 MAIN EXECUTION
 # --------------------------------------
 if col1.button("🚀 EXECUTE"):
     if not prompt:
@@ -169,15 +181,16 @@ if col1.button("🚀 EXECUTE"):
             t2.start()
             t3.start()
 
-            # ✅ NON-BLOCKING TIMEOUTS
             t1.join(timeout=45)
             t2.join(timeout=25)
             t3.join(timeout=35)
 
         # --------------------------------------
-        # 🧠 SMART RCA FALLBACK
+        # 🧠 RCA FALLBACK + ERROR DISPLAY
         # --------------------------------------
         if not res.rca_intel:
+            st.warning(f"⚠️ Primary Engine Failed: {res.rca_status}")
+
             res.rca_intel = f"""
 Fallback Strategic RCA:
 
@@ -186,18 +199,17 @@ Fallback Strategic RCA:
 • Ergonomic stitching (diamond / ribbed)  
 • Shift toward sustainable leather processing  
 • Modular seat cover customization rising  
-
-(Primary AI engine unavailable)
 """
 
         st.subheader("📊 RCA")
         st.write(res.rca_intel)
 
         # --------------------------------------
-        # 🎨 IMAGE
+        # 🎨 IMAGE + COUNTER FIX
         # --------------------------------------
         if res.ai_concept:
             st.image(res.ai_concept)
+            st.session_state.count += 1   # ✅ COUNTER FIX
 
         # --------------------------------------
         # 🔍 SPEC FIX
@@ -238,4 +250,4 @@ if col2.button("🎨 RENDER"):
         img = hf_gen_image(f"{prompt}, ultra realistic, 8k")
         if img:
             st.image(img)
-            st.session_state.count += 1
+            st.session_state.count += 1   # ✅ COUNTER
