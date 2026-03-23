@@ -70,7 +70,6 @@ ANALYSIS_FALLBACK_MODELS = [
     "deepseek/deepseek-r1-distill-llama-70b:free",
     "meta-llama/llama-3.2-3b-instruct:free",
     "nvidia/nemotron-nano-12b-v2-vl:free",
-    "nvidia/nemotron-nano-9b-v2:free",
     "x-ai/grok-4.1-fast:free",
 ]
 
@@ -97,7 +96,7 @@ def call_openrouter_fallback(prompt_text: str):
             time.sleep(1)
         except:
             continue
-    return "[❌ Error: All Technical Engines Timed Out. Verify Connection.]"
+    return "[❌ Error: Technical Engines Timed Out. Verify Connection.]"
 
 # =====================================================================
 # 🛰️ HELPER ENGINES
@@ -119,11 +118,12 @@ def hf_gen_image(prompt_text, width=1024, height=512):
     except: return None
 
 # --------------------------------------
-# SIDEBAR (COUNTER DISPLAY)
+# SIDEBAR (LEFT COLUMN COUNTER)
 # --------------------------------------
 st.sidebar.title("🔐 Control Panel")
 st.sidebar.metric("Analysis Generations", usage["count"])
 st.sidebar.markdown("---")
+st.sidebar.caption(f"Last Session Update: {datetime.now().strftime('%H:%M:%S')}")
 
 # --------------------------------------
 # 🎨 MAIN UI EXECUTION
@@ -137,29 +137,23 @@ if col_btn1.button("🚀 EXECUTE STRATEGIC ANALYSIS"):
     else:
         st.markdown("---")
         with st.spinner("Processing CEO-Level Intelligence Chain (Chemistry/Physics/Business)..."):
-            # 1. Concurrent Logic (RCA + Metadata)
+            # RCA and Metadata logic
             rca_query = f"Perform CEO-level Root Cause Analysis for: {prompt}. Focus on Physics, Chemistry, and 2026 Industry standards."
             rca_intel = call_openrouter_fallback(rca_query)
             
             meta_query = f"Return ONLY a JSON list of 3 automotive variations for '{prompt}'. Use keys: Brand, Country, Type, Material, Strength."
             specs_raw = call_openrouter_fallback(meta_query)
             
-            # 2. Assets
+            # Asset logic
             market_photos = get_serp_images(f"{prompt} 2026 industrial reference")
             ai_concept = hf_gen_image(f"3-way automotive engineering split view, technical diagram, {prompt}, studio lighting, 8k")
 
-            # --- DISPLAY RCA ---
             st.markdown("<div class='rca-box'><h3>STRATEGIC ROOT CAUSE ANALYSIS</h3>" + rca_intel + "</div>", unsafe_allow_html=True)
-            
-            # --- DISPLAY AI CONCEPT ---
-            if ai_concept:
-                st.image(ai_concept, caption="AI Concept Design Matrix (Structural Breakdown)", use_column_width=True)
+            if ai_concept: st.image(ai_concept, caption="AI Concept Design Matrix", use_column_width=True)
 
-            # --- DISPLAY DYNAMIC DATA MATRIX ---
             st.markdown("<div class='ui-box'><h3>🔍 Technical Markings & Real-World References</h3>", unsafe_allow_html=True)
             cols = st.columns(3)
             
-            # Robust JSON Parse
             try:
                 match = re.search(r'\[.*\]', specs_raw, re.DOTALL)
                 specs = json.loads(match.group()) if match else []
@@ -191,7 +185,7 @@ if col_btn2.button("📷 HIGH-RES 3D RENDER"):
             if render:
                 usage["count"] += 1
                 st.image(render, caption="Final Engineering Render", use_column_width=True)
-                st.rerun() # Updates Sidebar Counter
+                st.rerun() 
 
 # --- DYNAMIC FOOTER ---
 if prompt:
