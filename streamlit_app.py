@@ -7,7 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 # --------------------------------------
-# 🔧 PAGE CONFIG + THEME
+# 🔧 PAGE CONFIG + THEME + STYLING
 # --------------------------------------
 st.set_page_config(
     page_title="Pictator Creator - Automotive 3D Pro",
@@ -22,6 +22,9 @@ st.markdown(
     .label-header { color: #00eaff; font-weight: bold; font-size: 20px; border-bottom: 1px solid #333; margin-bottom: 10px; }
     .meta-label { color: #888; font-size: 11px; font-weight: 700; text-transform: uppercase; }
     .meta-value { color: #fff; font-size: 14px; margin-bottom: 8px; }
+    .ui-box { border: 2px solid #00eaff; border-radius: 15px; padding: 20px; background: #1a1c24; margin-bottom: 25px; }
+    .spec-header { color: #00eaff; font-size: 14px; font-weight: bold; text-transform: uppercase; margin-top: 10px; }
+    .spec-text { color: #ffffff; font-size: 15px; margin-bottom: 10px; }
     </style>
     <h1 style='text-align:center;color:#00eaff;font-size:45px;'>🏎️ Pictator Creator – Automotive 3D Edition</h1>
     <h3 style='text-align:center;color:#ffffff;'>Multi-User | Trend Design | Engineering Graphics</h3>
@@ -31,7 +34,7 @@ st.markdown(
 )
 
 # =====================================================================
-# 🔵 GLOBAL USAGE TRACKER (Sidebar Visible)
+# 🔵 GLOBAL USAGE TRACKER
 # =====================================================================
 @st.cache_resource
 def init_usage_store():
@@ -61,20 +64,16 @@ SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
 # --------------------------------------
-# SIDEBAR LOGIN & HISTORY COUNTER
+# SIDEBAR LOGIN & HISTORY
 # --------------------------------------
 st.sidebar.title("🔐 User Dashboard")
 
 if st.session_state.logged_in:
     user = st.session_state.current_user
     st.sidebar.success(f"User: {user}")
-    
-    # --- 📸 IMAGE GENERATION COUNTER ---
     user_stats = usage_store["users"].get(user, {"count": 0, "last": "No history"})
-    st.sidebar.markdown("### 📊 Your History")
     st.sidebar.metric("Images Generated", user_stats["count"])
     st.sidebar.caption(f"Last used: {user_stats['last']}")
-    
     if st.sidebar.button("🚪 Logout"):
         st.session_state.logged_in = False
         st.rerun()
@@ -92,14 +91,12 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================================================
-# 🛰️ ENGINES (HF & OPENROUTER FREE MODELS)
+# 🛰️ ENGINES
 # =====================================================================
 OR_MODELS = [
     "x-ai/grok-4.1-fast:free",
     "deepseek/deepseek-r1-distill-llama-70b:free",
-    "openai/gpt-oss-20b:free",
-    "meta-llama/llama-3.2-3b-instruct:free",
-    "nvidia/nemotron-nano-12b-v2-vl:free"
+    "meta-llama/llama-3.2-3b-instruct:free"
 ]
 
 def get_serp_images(query):
@@ -120,8 +117,19 @@ def hf_router_generate_image(model_repo, prompt, width=1024, height=1024):
     except: return None
     return {"type": "error", "data": "HF Router Failed"}
 
+def get_openrouter_intel(prompt):
+    for model in OR_MODELS:
+        try:
+            r = requests.post("https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+                json={"model": model, "messages": [{"role": "user", "content": f"Provide technical 2026 specs for {prompt}. Include Material, Brand, and Tier."}]},
+                timeout=15)
+            if r.status_code == 200: return r.json()["choices"][0]["message"]["content"]
+        except: continue
+    return "Standard 2026 Automotive Trends: Lightweight Composites and Bio-Based Textures."
+
 # =====================================================================
-# 🎨 MAIN UI - DESIGN & TRENDS
+# 🎨 MAIN UI
 # =====================================================================
 MODELS = {
     "Realistic Vision V6 (Automotive)": "SG161222/Realistic_Vision_V6.0_B1_noVAE",
@@ -130,67 +138,77 @@ MODELS = {
 }
 
 model_choice = st.selectbox("Select Model Engine", list(MODELS.keys()))
-prompt = st.text_area("Engineering / Design Prompt", "premium nappa leather seat covers, diamond stitching, beige and black dual tone")
+# Prompt is blank by default
+prompt = st.text_area("Engineering / Design Prompt", placeholder="e.g. Nappa leather seat covers for BMW i7, diamond stitching...")
 
-# --- TRENDS & SEARCH MATRIX BLOCK ---
-if prompt and any(x in prompt.lower() for x in ["design", "reference", "car", "cover", "part"]):
-    st.markdown("---")
-    st.subheader("📸 AI Trend & Market Analysis (Simultaneous)")
-    
-    # OpenRouter Logic with Free Model Failover
-    trend_text = "Sustainable luxury, breathable materials."
-    with st.spinner("Analyzing Materials (OpenRouter)..."):
-        for model in OR_MODELS:
-            try:
-                r = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
-                    json={"model": model, "messages": [{"role": "user", "content": f"Briefly list materials and 2026 trends for: {prompt}"}]}
-                )
-                if r.status_code == 200:
-                    trend_text = r.json()["choices"][0]["message"]["content"]
-                    break
-            except: continue
+col_btn1, col_btn2 = st.columns(2)
 
-    # HF Generation
-    merged_prompt = f"Automotive part photography. Left: Premium. Center: Modern. Right: Tech. {prompt}. 8k, realistic."
-    with st.spinner("Generating Design Concepts (HuggingFace)..."):
-        out_ai = hf_router_generate_image("black-forest-labs/FLUX.1-schnell", merged_prompt, width=1024, height=512)
+# --- 📸 ANALYSIS SYSTEM ---
+if col_btn1.button("🔍 Run Trend & Market Analysis"):
+    if not prompt:
+        st.error("Please enter a prompt to analyze.")
+    else:
+        st.markdown("---")
+        with st.spinner("Simultaneous Intelligence Processing (OpenRouter + Search + HF)..."):
+            # Execute all three simultaneously
+            tech_specs = get_openrouter_intel(prompt)
+            market_data = get_serp_images(f"{prompt} 2026 luxury price")
+            merged_prompt = f"Automotive part photography comparison. Left: Premium. Center: Modern. Right: Performance. {prompt}. 8k, realistic."
+            out_ai = hf_router_generate_image("black-forest-labs/FLUX.1-schnell", merged_prompt, width=1024, height=512)
 
-    if out_ai and out_ai["type"] == "image":
-        st.image(out_ai["data"], caption="AI Concept Design Matrix", use_column_width=True)
+            # Display HF AI Comparison
+            if out_ai and out_ai["type"] == "image":
+                st.image(out_ai["data"], caption="AI Concept Design Matrix", use_column_width=True)
 
-    # Reference Search Box
-    st.markdown("### 🔍 Real-World Product Reference & Purchase Links")
-    ref_photos = get_serp_images(f"{prompt} for cars 2026 price")
-    cols = st.columns(3)
-    
-    car_meta = [
-        {"name": "Elegant Auto", "origin": "India 🇮🇳", "mat": "Nappa Leatherette", "tier": "Premium"},
-        {"name": "Tessories", "origin": "Global 🌍", "mat": "Vegan Microfiber", "tier": "High-Tech"},
-        {"name": "Autoform", "origin": "India 🇮🇳", "mat": "PU Dry-Feel", "tier": "Economy Plus"}
-    ]
-    
-    for i, col in enumerate(cols):
-        with col:
-            meta = car_meta[i]
-            st.markdown(f"""
-                <div class='car-card'>
-                    <div class='label-header'>{meta['name']}</div>
-                    <div class='meta-label'>Region</div><div class='meta-value'>{meta['origin']}</div>
-                    <div class='meta-label'>Primary Material</div><div class='meta-value'>{meta['mat']}</div>
-                    <div class='meta-label'>Market Segment</div><div class='meta-value'>{meta['tier']}</div>
-                </div>
-            """, unsafe_allow_html=True)
-            if i < len(ref_photos):
-                st.image(ref_photos[i]['thumbnail'], use_column_width=True)
-                st.markdown(f"[🛒 View Product & Price]({ref_photos[i]['link']})")
+            # Display Market Matrix (UI Boxes)
+            st.markdown("<div class='ui-box'>", unsafe_allow_html=True)
+            st.subheader("🔍 Real-World Product Reference & Purchase Links")
+            cols = st.columns(3)
+            car_meta = [
+                {"name": "Elegant Auto", "origin": "India 🇮🇳", "mat": "Nappa Leatherette", "tier": "Premium"},
+                {"name": "Tessories", "origin": "Global 🌍", "mat": "Vegan Microfiber", "tier": "High-Tech"},
+                {"name": "Autoform", "origin": "India 🇮🇳", "mat": "PU Dry-Feel", "tier": "Economy Plus"}
+            ]
+            for i, col in enumerate(cols):
+                with col:
+                    meta = car_meta[i]
+                    st.markdown(f"**{meta['name']}**")
+                    st.caption(f"{meta['origin']} | {meta['tier']}")
+                    if i < len(market_data):
+                        st.image(market_data[i]['thumbnail'], use_column_width=True)
+                        st.link_button("View Product 🔗", market_data[i]['link'], use_container_width=True)
+                    st.markdown(f"<div class='meta-label'>Material</div><div class='meta-value'>{meta['mat']}</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-# --- FINAL GENERATION ---
+            # Display OpenRouter Specs
+            st.subheader("📝 OpenRouter Technical Specifications")
+            st.info(tech_specs)
+
+# --- 🚀 FINAL RENDER SYSTEM ---
+if col_btn2.button("🚀 Finalize Engineering Render"):
+    if not prompt:
+        st.error("Please enter a prompt to render.")
+    else:
+        st.markdown("---")
+        with st.spinner("Rendering High-Resolution 3D Output..."):
+            res = hf_router_generate_image(MODELS[model_choice], prompt)
+            if res and res["type"] == "image":
+                update_usage(st.session_state.current_user)
+                st.image(res["data"], caption="Final Rendered Output", use_column_width=True)
+                buf = io.BytesIO()
+                res["data"].save(buf, format="PNG")
+                st.download_button("💾 Download PNG", buf.getvalue(), "render.png", "image/png")
+                st.success("Generation tracked in your history!")
+
+# --- FOOTER RESOURCES ---
 st.markdown("---")
-if st.button("🚀 Finalize Engineering Render"):
-    with st.spinner("Rendering..."):
-        res = hf_router_generate_image(MODELS[model_choice], prompt)
-        if res and res["type"] == "image":
-            update_usage(st.session_state.current_user)
-            st.image(res["data"], caption="Final Rendered Output", use_column_width=True)
-            st.success("Generation added to your user history!")
+st.subheader("🌐 Global Trend Inspiration")
+res_cols = st.columns(4)
+resources = [
+    {"title": "Luxury Interiors 2026", "url": "https://www.youtube.com/results?search_query=luxury+car+interiors+2026+trends", "type": "YouTube"},
+    {"title": "German Engineering Design", "url": "https://www.bmw.com/en/design.html", "type": "Website"},
+    {"title": "Tesla Accessory Trends", "url": "https://www.tesla.com/shop", "type": "Website"},
+    {"title": "Material Science Innovations", "url": "https://www.dezeen.com/tag/automotive-design/", "type": "Web Journal"}
+]
+for i, r_col in enumerate(res_cols):
+    r_col.link_button(f"{resources[i]['type']}: {resources[i]['title']}", resources[i]['url'], use_container_width=True)
