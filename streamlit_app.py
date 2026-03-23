@@ -227,11 +227,6 @@ st.title("🎨 Pictator Creator (HF Router Only)")
 
 st.subheader("Create Engineering Drawing using HF Router Models")
 
-# --------------------------------------
-# 📸 AI TREND DESIGN PREVIEW (MERGED IMAGE)
-# --------------------------------------
-if "design" in prompt.lower() or "reference" in prompt.lower() or "photograph" in prompt.lower():
-
     st.markdown("### 📸 AI Trend-Based Design (Global Market)")
 
     import requests
@@ -328,6 +323,11 @@ prompt = st.text_area(
     "technical CNC blueprint, mechanical disc brake, top view, thin black engineering lineart"
 )
 
+# --------------------------------------
+# 📸 AI TREND DESIGN PREVIEW (MERGED IMAGE)
+# --------------------------------------
+if "design" in prompt.lower() or "reference" in prompt.lower() or "photograph" in prompt.lower():
+    
 col1, col2 = st.columns(2)
 with col1:
     width = st.number_input("Width", 256, 1536, 768)
