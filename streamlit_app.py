@@ -45,7 +45,7 @@ SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
 # --------------------------------------
-# ⚡ FLASHMIND ENGINE (MULTI-MODEL)
+# ⚡ FLASHMIND ENGINE
 # --------------------------------------
 ANALYSIS_FALLBACK_MODELS = [
     "openai/gpt-oss-20b:free",
@@ -71,7 +71,8 @@ def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
                     "messages": [
                         {"role": "system", "content": "You are an automotive engineering expert."},
                         {"role": "user", "content": prompt}
-                    ]
+                    ],
+                    "temperature": 0.2
                 },
                 timeout=60
             )
@@ -91,6 +92,25 @@ def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
     return None, "All models failed"
 
 # --------------------------------------
+# SAFE JSON EXTRACTOR (🔥 FIX)
+# --------------------------------------
+def safe_json_extract(text):
+    try:
+        match = re.search(r"\[.*\]", str(text), re.DOTALL)
+        if match:
+            raw = match.group()
+
+            raw = raw.replace("'", '"')
+            raw = re.sub(r",\s*}", "}", raw)
+            raw = re.sub(r",\s*]", "]", raw)
+
+            return json.loads(raw)
+    except Exception as e:
+        print("JSON parse failed:", e)
+
+    return []
+
+# --------------------------------------
 # IMAGE ENGINE
 # --------------------------------------
 def hf_gen_image(prompt):
@@ -103,50 +123,39 @@ def hf_gen_image(prompt):
         return None
 
 # --------------------------------------
-# THREADS (UPDATED)
+# THREADS
 # --------------------------------------
 def thread_rca(res, prompt):
-    try:
-        output, status = call_openrouter_with_fallback_requests(
-            f"""
-            Generate current automotive trends for:
+    output, status = call_openrouter_with_fallback_requests(
+        f"""
+        Generate automotive trends:
 
-            {prompt}
+        {prompt}
 
-            - Strict domain match
-            - Real materials
-            - 5 bullet points
-            """,
-            OPENROUTER_API_KEY
-        )
-        res.rca_intel = output
-        res.rca_status = status
-    except Exception as e:
-        res.rca_intel = None
-        res.rca_status = str(e)
+        - Strict domain match
+        - 5 bullet points
+        """,
+        OPENROUTER_API_KEY
+    )
+    res.rca_intel = output
+    res.rca_status = status
 
 
 def thread_meta(res, prompt):
-    try:
-        result, status = call_openrouter_with_fallback_requests(
-            f"""
-            Generate 3 REAL automotive vendors for:
+    result, status = call_openrouter_with_fallback_requests(
+        f"""
+        Generate 3 REAL automotive vendors:
 
-            {prompt}
+        {prompt}
 
-            Include:
-            - Brand
-            - Vehicle
-            - Material (match prompt)
-            - Website
-
-            Return JSON
-            """,
-            OPENROUTER_API_KEY
-        )
-        res.specs_raw = result
-    except:
-        res.specs_raw = None
+        Return STRICT JSON ONLY.
+        No explanation.
+        No text before or after.
+        Valid JSON array format only.
+        """,
+        OPENROUTER_API_KEY
+    )
+    res.specs_raw = result
 
 
 def thread_assets(res, prompt):
@@ -215,26 +224,12 @@ if col1.button("🚀 EXECUTE"):
             st.session_state.count += 1
 
         # --------------------------------------
-        # SPECS
+        # SPECS (SAFE PARSE)
         # --------------------------------------
-        specs = []
-        try:
-            match = re.search(r"\[.*\]", str(res.specs_raw), re.DOTALL)
-            if match:
-                specs = json.loads(match.group())
-        except:
+        specs = safe_json_extract(res.specs_raw)
+
+        if not isinstance(specs, list):
             specs = []
-
-        if not specs:
-            ai_specs, _ = call_openrouter_with_fallback_requests(
-                f"Generate vendors for: {prompt} JSON",
-                OPENROUTER_API_KEY
-            )
-
-            if ai_specs:
-                match = re.search(r"\[.*\]", ai_specs, re.DOTALL)
-                if match:
-                    specs = json.loads(match.group())
 
         if not specs:
             specs = [{"Brand": "Fallback System", "Vehicle": "Concept", "Material": "Synthetic"}]
@@ -259,7 +254,9 @@ if col1.button("🚀 EXECUTE"):
                     st.link_button("🌐 Visit Website", d.get("Website"))
 
                 if i < len(res.market_photos):
-                    st.image(res.market_photos[i]["thumbnail"])
+                    img_url = res.market_photos[i].get("thumbnail") or res.market_photos[i].get("original")
+                    if img_url:
+                        st.image(img_url)
 
 # --------------------------------------
 # RENDER
