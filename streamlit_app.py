@@ -127,8 +127,7 @@ def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
                         {"role": "system", "content": "You are an automotive engineering expert."},
                         {"role": "user", "content": prompt}
                     ],
-                    "temperature": 0.2,
-                    "stream"=stream
+                    "temperature": 0.2
                 },
                 timeout=60
             )
