@@ -21,7 +21,6 @@ st.caption("Strategic Parallel RCA | Multithreaded Design | 2026 Material Intel"
 if "count" not in st.session_state:
     st.session_state.count = 0
 
-# ✅ SIDEBAR (UNCHANGED)
 st.sidebar.title("🔐 Control Panel")
 st.sidebar.metric("🖼️ Images Generated", st.session_state.count)
 st.sidebar.markdown("---")
@@ -45,13 +44,11 @@ SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
 MODELS = [
-    "openai/gpt-oss-20b:free",
-    "meta-llama/llama-3.2-3b-instruct:free",
-    "deepseek/deepseek-r1-distill-llama-70b:free"
+    "meta-llama/llama-3.2-3b-instruct:free"
 ]
 
 # --------------------------------------
-# 🔥 OPENROUTER ENGINE
+# OPENROUTER ENGINE
 # --------------------------------------
 def call_openrouter(prompt):
     headers = {
@@ -62,29 +59,28 @@ def call_openrouter(prompt):
     last_error = None
 
     for model in MODELS:
-        for attempt in range(2):
-            try:
-                r = requests.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=headers,
-                    json={
-                        "model": model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.2
-                    },
-                    timeout=40
-                )
+        try:
+            r = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.3
+                },
+                timeout=35
+            )
 
-                if r.status_code == 200:
-                    data = r.json()
-                    content = data.get("choices", [{}])[0].get("message", {}).get("content")
-                    if content:
-                        return content.strip(), "OK"
-                else:
-                    last_error = f"HTTP {r.status_code}"
+            if r.status_code == 200:
+                data = r.json()
+                content = data.get("choices", [{}])[0].get("message", {}).get("content")
+                if content:
+                    return content.strip(), "OK"
+            else:
+                last_error = f"HTTP {r.status_code}"
 
-            except Exception as e:
-                last_error = str(e)
+        except Exception as e:
+            last_error = str(e)
 
     return None, last_error or "Timeout"
 
@@ -105,7 +101,19 @@ def hf_gen_image(prompt):
 # --------------------------------------
 def thread_rca(res, prompt):
     try:
-        output, status = call_openrouter(f"Current automotive material and design trends: {prompt}")
+        output, status = call_openrouter(
+            f"""
+            Generate current automotive trends based on:
+
+            {prompt}
+
+            Requirements:
+            - Must match topic exactly
+            - No unrelated materials
+            - Use correct domain (lighting, seats, electronics etc.)
+            - 5 bullet points only
+            """
+        )
         res.rca_intel = output
         res.rca_status = status
     except Exception as e:
@@ -117,7 +125,14 @@ def thread_meta(res, prompt):
     try:
         result = call_openrouter(
             f"""
-            Generate 3 automotive seat/material specs with car models.
+            Generate 3 automotive specifications based on:
+
+            {prompt}
+
+            Requirements:
+            - Include Vehicle
+            - Use correct materials for topic
+            - Real brands or OEM suppliers
 
             Return JSON:
             [
@@ -130,8 +145,6 @@ def thread_meta(res, prompt):
                 "Strength": ""
               }}
             ]
-
-            Topic: {prompt}
             """
         )
         res.specs_raw = result[0] if result else None
@@ -160,7 +173,7 @@ prompt = st.text_area("Enter Topic")
 col1, col2 = st.columns(2)
 
 # --------------------------------------
-# 🚀 EXECUTION
+# EXECUTION
 # --------------------------------------
 if col1.button("🚀 EXECUTE"):
     if not prompt:
@@ -182,18 +195,20 @@ if col1.button("🚀 EXECUTE"):
             t3.join(timeout=35)
 
         # --------------------------------------
-        # CURRENT TRENDS
+        # CURRENT TRENDS (DYNAMIC)
         # --------------------------------------
         if not res.rca_intel:
             st.warning(f"⚠️ Primary Engine Failed: {res.rca_status}")
-            res.rca_intel = """
-Current Trends Insight:
 
-• Hybrid leather (Nappa + Alcantara) dominates EU market  
-• Laser perforation for cooling  
-• Ergonomic stitching  
-• Sustainable materials  
-• Modular customization  
+            # 🔥 dynamic fallback
+            res.rca_intel = f"""
+Current Trends Insight (Generated Fallback):
+
+• Innovations evolving in: {prompt}
+• Material optimization based on component function  
+• Increased focus on efficiency and durability  
+• Smart integration with electronics and sensors  
+• European manufacturing adapting to modular design  
 """
 
         st.subheader("📊 Current Trends")
@@ -207,7 +222,7 @@ Current Trends Insight:
             st.session_state.count += 1
 
         # --------------------------------------
-        # AI-DRIVEN SPECS WITH VEHICLE
+        # SPECS (FULLY DYNAMIC)
         # --------------------------------------
         specs = []
         try:
@@ -217,12 +232,33 @@ Current Trends Insight:
         except:
             specs = []
 
-        # FINAL FALLBACK (WITH VEHICLE)
+        # 🔥 AI FALLBACK (SECONDARY)
+        if not specs:
+            try:
+                fallback_prompt = f"""
+                Generate 3 automotive specs based on:
+
+                {prompt}
+
+                Must match topic exactly.
+                Return JSON only.
+                """
+
+                ai_specs, _ = call_openrouter(fallback_prompt)
+
+                if ai_specs:
+                    match = re.search(r"\[.*\]", ai_specs, re.DOTALL)
+                    if match:
+                        specs = json.loads(match.group())
+            except:
+                specs = []
+
+        # 🔥 FINAL SAFE FALLBACK
         if not specs:
             specs = [
-                {"Brand": "BMW Interior Systems", "Vehicle": "BMW 7 Series", "Country": "Germany", "Type": "Performance", "Material": "Nappa Leather", "Strength": "High Durability"},
-                {"Brand": "Ferrari Design Lab", "Vehicle": "Ferrari Roma", "Country": "Italy", "Type": "Luxury", "Material": "Alcantara + Leather", "Strength": "Premium"},
-                {"Brand": "Renault EcoTech", "Vehicle": "Renault Megane E-Tech", "Country": "France", "Type": "Eco", "Material": "Bio Leather", "Strength": "Sustainable"},
+                {"Brand": "Generic Auto", "Vehicle": "Concept Model", "Country": "EU", "Type": "Adaptive System", "Material": "Component-specific", "Strength": "Standard"},
+                {"Brand": "NextGen Mobility", "Vehicle": "Prototype", "Country": "Germany", "Type": "Smart Module", "Material": "Optimized Material", "Strength": "Balanced"},
+                {"Brand": "Future AutoTech", "Vehicle": "Platform X", "Country": "France", "Type": "Integrated System", "Material": "Advanced Composite", "Strength": "High Efficiency"},
             ]
 
         st.subheader("🔍 Technical Specs")
@@ -241,7 +277,7 @@ Current Trends Insight:
                     st.image(res.market_photos[i]["thumbnail"])
 
 # --------------------------------------
-# 🎨 RENDER
+# RENDER
 # --------------------------------------
 if col2.button("🎨 RENDER"):
     if prompt:
