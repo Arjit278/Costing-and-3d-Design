@@ -57,7 +57,14 @@ st.sidebar.metric("🖼️ Images Generated", st.session_state.count)
 st.sidebar.markdown("---")
 
 # --------------------------------------
-# 🌐 WEBSITE FETCH (NEW ADDITION)
+# API CONFIG
+# --------------------------------------
+OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
+SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
+HF_TOKEN = st.secrets.get("HF_TOKEN", "")
+
+# --------------------------------------
+# 🌐 WEBSITE FETCH
 # --------------------------------------
 def fetch_real_website(brand):
     try:
@@ -76,9 +83,18 @@ def fetch_real_website(brand):
     except:
         pass
 
-    # fallback
     clean = brand.lower().replace(" ", "").replace("-", "")
     return f"https://www.{clean}.com"
+
+# --------------------------------------
+# 🖼️ IMAGE FALLBACK
+# --------------------------------------
+def generate_fallback_images(prompt):
+    fallback = []
+    for i in range(3):
+        url = f"https://source.unsplash.com/600x400/?car-seat,{i},{prompt.replace(' ', '%20')}"
+        fallback.append({"thumbnail": url})
+    return fallback
 
 # --------------------------------------
 # RESULT CONTAINER
@@ -90,13 +106,6 @@ class AnalysisResults:
         self.market_photos = []
         self.ai_concept = None
         self.rca_status = "OK"
-
-# --------------------------------------
-# API CONFIG
-# --------------------------------------
-OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
-SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
-HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
 # --------------------------------------
 # ⚡ FLASHMIND ENGINE
@@ -146,7 +155,7 @@ def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
     return None, "All models failed"
 
 # --------------------------------------
-# SAFE JSON EXTRACTOR
+# SAFE JSON
 # --------------------------------------
 def safe_json_extract(text):
     try:
@@ -157,9 +166,8 @@ def safe_json_extract(text):
             raw = re.sub(r",\s*}", "}", raw)
             raw = re.sub(r",\s*]", "]", raw)
             return json.loads(raw)
-    except Exception as e:
-        print("JSON parse failed:", e)
-
+    except:
+        pass
     return []
 
 # --------------------------------------
@@ -174,15 +182,9 @@ def normalize_specs(specs):
 
         normalized.append({
             "Brand": item.get("Brand") or item.get("vendor") or "Unknown",
-            "Vehicle": (
-                item.get("Vehicle")
-                or (item.get("compatibility")[0] if item.get("compatibility") else "Generic")
-            ),
+            "Vehicle": item.get("Vehicle") or (item.get("compatibility")[0] if item.get("compatibility") else "Generic"),
             "Type": item.get("Type") or item.get("model") or "Standard",
-            "Material": (
-                item.get("Material")
-                or ("Synthetic Leather" if "leather" in str(item).lower() else "Advanced Material")
-            ),
+            "Material": item.get("Material") or ("Synthetic Leather" if "leather" in str(item).lower() else "Advanced"),
             "Strength": item.get("Strength") or "Optimized",
             "Description": item.get("description") or "",
             "Website": item.get("Website") or ""
@@ -206,27 +208,14 @@ def hf_gen_image(prompt):
 # THREADS
 # --------------------------------------
 def thread_rca(res, prompt):
-    output, status = call_openrouter_with_fallback_requests(
-        f"Generate automotive trends: {prompt}",
-        OPENROUTER_API_KEY
+    res.rca_intel, res.rca_status = call_openrouter_with_fallback_requests(
+        f"Generate automotive trends: {prompt}", OPENROUTER_API_KEY
     )
-    res.rca_intel = output
-    res.rca_status = status
-
 
 def thread_meta(res, prompt):
-    result, status = call_openrouter_with_fallback_requests(
-        f"""
-        Generate 3 REAL automotive vendors:
-
-        {prompt}
-
-        Return STRICT JSON ONLY.
-        """,
-        OPENROUTER_API_KEY
+    res.specs_raw, _ = call_openrouter_with_fallback_requests(
+        f"Generate 3 automotive vendors JSON: {prompt}", OPENROUTER_API_KEY
     )
-    res.specs_raw = result
-
 
 def thread_assets(res, prompt):
     try:
@@ -239,83 +228,82 @@ def thread_assets(res, prompt):
     except:
         res.market_photos = []
 
-    res.ai_concept = hf_gen_image(f"{prompt}, automotive engineering diagram")
+    res.ai_concept = hf_gen_image(prompt)
 
 # --------------------------------------
-# UI INPUT
+# UI
 # --------------------------------------
 prompt = st.text_area("Enter Topic")
 
 col1, col2 = st.columns(2)
 
-# --------------------------------------
-# EXECUTION
-# --------------------------------------
 if col1.button("🚀 EXECUTE"):
-    if not prompt:
-        st.warning("Enter prompt")
-    else:
-        res = AnalysisResults()
+    res = AnalysisResults()
 
-        with st.status("Running engines...", expanded=True):
-            t1 = threading.Thread(target=thread_rca, args=(res, prompt))
-            t2 = threading.Thread(target=thread_meta, args=(res, prompt))
-            t3 = threading.Thread(target=thread_assets, args=(res, prompt))
+    t1 = threading.Thread(target=thread_rca, args=(res, prompt))
+    t2 = threading.Thread(target=thread_meta, args=(res, prompt))
+    t3 = threading.Thread(target=thread_assets, args=(res, prompt))
 
-            t1.start(); t2.start(); t3.start()
-            t1.join(timeout=40)
-            t2.join(timeout=25)
-            t3.join(timeout=30)
+    t1.start(); t2.start(); t3.start()
+    t1.join(); t2.join(); t3.join()
 
-        st.subheader("📊 Current Trends")
-        st.write(res.rca_intel)
+    # ensure images
+    if not res.market_photos or len(res.market_photos) < 3:
+        res.market_photos = generate_fallback_images(prompt)
 
-        if res.ai_concept:
-            st.image(res.ai_concept)
-            st.session_state.count += 1
+    st.subheader("📊 Current Trends")
+    st.write(res.rca_intel)
 
-        raw_specs = safe_json_extract(res.specs_raw)
-        specs = normalize_specs(raw_specs)
+    if res.ai_concept:
+        st.image(res.ai_concept)
 
-        if not specs:
-            specs = [{
-                "Brand": "Recaro",
-                "Vehicle": "Grand Vitara",
-                "Material": "Synthetic Leather"
-            }]
+    raw_specs = safe_json_extract(res.specs_raw)
+    specs = normalize_specs(raw_specs)
 
-        st.subheader("🔍 Technical Specs")
+    # AI retry only (no static)
+    if not specs:
+        retry, _ = call_openrouter_with_fallback_requests(
+            f"Generate vendors JSON for {prompt}", OPENROUTER_API_KEY
+        )
+        specs = normalize_specs(safe_json_extract(retry))
 
-        cols = st.columns(3)
-        for i, col in enumerate(cols):
-            d = specs[i % len(specs)]
-            with col:
-                st.markdown(f"### {d.get('Brand')}")
-                st.write(f"**Vehicle:** {d.get('Vehicle')}")
+    st.subheader("🔍 Technical Specs")
 
-                for k, v in d.items():
-                    if k not in ["Vehicle", "Website"]:
-                        st.write(f"**{k}:** {v}")
+    cols = st.columns(3)
+    for i, col in enumerate(cols):
+        d = specs[i % len(specs)] if specs else {}
 
-                if d.get("Description"):
-                    st.caption(d.get("Description"))
+        with col:
+            brand = d.get("Brand") or f"auto-seat-{i}"
 
-                website = d.get("Website") or fetch_real_website(d.get("Brand"))
+            st.markdown(f"### {brand}")
+            st.write(f"**Vehicle:** {d.get('Vehicle')}")
 
-                if website:
-                    st.link_button("🌐 Visit Website", website)
+            for k, v in d.items():
+                if k not in ["Vehicle", "Website"]:
+                    st.write(f"**{k}:** {v}")
 
-                if i < len(res.market_photos):
-                    img_url = res.market_photos[i].get("thumbnail") or res.market_photos[i].get("original")
-                    if img_url:
-                        st.image(img_url)
+            if d.get("Description"):
+                st.caption(d.get("Description"))
+
+            # unique website
+            website = d.get("Website")
+            if not website:
+                website = fetch_real_website(brand)
+
+            if website:
+                website = website + f"?ref={i}"
+                st.link_button("🌐 Visit Website", website)
+
+            if i < len(res.market_photos):
+                img = res.market_photos[i].get("thumbnail") or res.market_photos[i].get("original")
+                if img:
+                    st.image(img)
 
 # --------------------------------------
 # RENDER
 # --------------------------------------
 if col2.button("🎨 RENDER"):
-    if prompt:
-        img = hf_gen_image(f"{prompt}, ultra realistic, 8k")
-        if img:
-            st.image(img)
-            st.session_state.count += 1
+    img = hf_gen_image(f"{prompt}, ultra realistic, 8k")
+    if img:
+        st.image(img)
