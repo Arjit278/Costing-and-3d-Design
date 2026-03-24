@@ -104,6 +104,7 @@ class AnalysisResults:
 # --------------------------------------
 ANALYSIS_FALLBACK_MODELS = [
     "qwen/qwen3-coder:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
     "meta-llama/llama-3.2-3b-instruct:free",
     "nousresearch/hermes-2-pro-llama-3-8b",
     "qwen/qwen3-next-80b-a3b-instruct:free",
