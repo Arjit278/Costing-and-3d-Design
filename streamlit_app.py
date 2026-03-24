@@ -6,12 +6,10 @@ import re
 import threading
 import time
 import random
-import zipfile
-from io import BytesIO
 from PIL import Image
 
 # --------------------------------------
-# 🔐 LOGIN SYSTEM (UNCHANGED)
+# 🔐 LOGIN SYSTEM (ADDED - NO REMOVAL)
 # --------------------------------------
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -41,7 +39,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # --------------------------------------
-# PAGE CONFIG
+# 🔧 PAGE CONFIG
 # --------------------------------------
 st.set_page_config(page_title="Pictator Pro", page_icon="🏎️", layout="wide")
 
@@ -49,7 +47,7 @@ st.title("🏎️ Pictator Pro – CEO Engineering Suite")
 st.caption("Strategic Parallel RCA | Multithreaded Design | 2026 Material Intel")
 
 # --------------------------------------
-# SESSION COUNTER
+# SESSION
 # --------------------------------------
 if "count" not in st.session_state:
     st.session_state.count = 0
@@ -72,7 +70,11 @@ def fetch_real_website(brand):
     try:
         r = requests.get(
             "https://serpapi.com/search",
-            params={"engine": "google", "q": f"{brand} official website", "api_key": SERP_API_KEY},
+            params={
+                "engine": "google",
+                "q": f"{brand} official website",
+                "api_key": SERP_API_KEY
+            },
             timeout=5
         )
         results = r.json().get("organic_results", [])
@@ -85,41 +87,7 @@ def fetch_real_website(brand):
     return f"https://www.{clean}.com"
 
 # --------------------------------------
-# 📦 DOWNLOAD PACKAGE (ADDED)
-# --------------------------------------
-def create_download_package(prompt, trends, specs, images):
-    zip_buffer = BytesIO()
-
-    with zipfile.ZipFile(zip_buffer, "w") as zf:
-
-        # TEXT
-        text = f"Prompt:\n{prompt}\n\nTrends:\n{trends}\n\nSpecs:\n\n"
-        for i, s in enumerate(specs):
-            text += f"{i+1}. {s.get('Brand')}\n"
-            for k, v in s.items():
-                text += f"{k}: {v}\n"
-            text += "\n"
-
-        zf.writestr("report.txt", text)
-
-        # IMAGES
-        for i, img in enumerate(images):
-            try:
-                if isinstance(img, str):
-                    r = requests.get(img, timeout=10)
-                    zf.writestr(f"image_{i+1}.jpg", r.content)
-                else:
-                    buf = BytesIO()
-                    img.save(buf, format="JPEG")
-                    zf.writestr(f"image_{i+1}.jpg", buf.getvalue())
-            except:
-                pass
-
-    zip_buffer.seek(0)
-    return zip_buffer
-
-# --------------------------------------
-# RESULT CLASS
+# RESULT CONTAINER
 # --------------------------------------
 class AnalysisResults:
     def __init__(self):
@@ -128,6 +96,53 @@ class AnalysisResults:
         self.market_photos = []
         self.ai_concept = None
         self.rca_status = "OK"
+
+# --------------------------------------
+# ⚡ FLASHMIND ENGINE
+# --------------------------------------
+ANALYSIS_FALLBACK_MODELS = [
+    "openai/gpt-oss-20b:free",
+    "deepseek/deepseek-r1-distill-llama-70b:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "x-ai/grok-4.1-fast:free",
+]
+
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+    for model in ANALYSIS_FALLBACK_MODELS:
+        try:
+            r = requests.post(
+                OPENROUTER_URL,
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "You are an automotive engineering expert."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.2
+                },
+                timeout=60
+            )
+
+            if r.status_code == 200:
+                data = r.json()
+                content = data.get("choices", [{}])[0].get("message", {}).get("content")
+                if content:
+                    return content.strip(), "OK"
+
+            elif r.status_code == 429:
+                time.sleep(2)
+
+        except:
+            continue
+
+    return None, "All models failed"
 
 # --------------------------------------
 # SAFE JSON
@@ -150,21 +165,25 @@ def safe_json_extract(text):
 # --------------------------------------
 def normalize_specs(specs):
     normalized = []
+
     for item in specs:
-        if isinstance(item, dict):
-            normalized.append({
-                "Brand": item.get("Brand") or item.get("vendor") or "Unknown",
-                "Vehicle": item.get("Vehicle") or "Generic",
-                "Type": item.get("Type") or "Standard",
-                "Material": item.get("Material") or "Synthetic Leather",
-                "Strength": item.get("Strength") or "Optimized",
-                "Description": item.get("description") or "",
-                "Website": item.get("Website") or ""
-            })
+        if not isinstance(item, dict):
+            continue
+
+        normalized.append({
+            "Brand": item.get("Brand") or item.get("vendor") or "Unknown",
+            "Vehicle": item.get("Vehicle") or (item.get("compatibility")[0] if item.get("compatibility") else "Generic"),
+            "Type": item.get("Type") or item.get("model") or "Standard",
+            "Material": item.get("Material") or ("Synthetic Leather" if "leather" in str(item).lower() else "Advanced"),
+            "Strength": item.get("Strength") or "Optimized",
+            "Description": item.get("description") or "",
+            "Website": item.get("Website") or ""
+        })
+
     return normalized
 
 # --------------------------------------
-# IMAGE ENGINE
+# IMAGE ENGINE (HF)
 # --------------------------------------
 def hf_gen_image(prompt):
     try:
@@ -176,44 +195,30 @@ def hf_gen_image(prompt):
         return None
 
 # --------------------------------------
-# OPENROUTER CALL
-# --------------------------------------
-def call_openrouter_with_fallback_requests(prompt, api_key):
-    try:
-        r = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "model": "openai/gpt-oss-20b:free",
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=30
-        )
-        return r.json()["choices"][0]["message"]["content"], "OK"
-    except:
-        return None, "Fail"
-
-# --------------------------------------
 # THREADS
 # --------------------------------------
-class Res:
-    pass
+def thread_rca(res, prompt):
+    res.rca_intel, res.rca_status = call_openrouter_with_fallback_requests(
+        f"Generate automotive trends: {prompt}", OPENROUTER_API_KEY
+    )
 
-def thread_data(res, prompt):
-    res.trend, _ = call_openrouter_with_fallback_requests(prompt, OPENROUTER_API_KEY)
-    res.specs = call_openrouter_with_fallback_requests(
-        f"Generate 3 vendors JSON: {prompt}", OPENROUTER_API_KEY
-    )[0]
+def thread_meta(res, prompt):
+    res.specs_raw, _ = call_openrouter_with_fallback_requests(
+        f"Generate 3 automotive vendors JSON: {prompt}", OPENROUTER_API_KEY
+    )
 
-def thread_images(res, prompt):
+def thread_assets(res, prompt):
     try:
         r = requests.get(
             "https://serpapi.com/search",
-            params={"engine": "google_images", "q": prompt, "api_key": SERP_API_KEY}
+            params={"engine": "google_images", "q": prompt, "api_key": SERP_API_KEY},
+            timeout=10
         )
-        res.images = r.json().get("images_results", [])
+        res.market_photos = r.json().get("images_results", [])[:3]
     except:
-        res.images = []
+        res.market_photos = []
+
+    res.ai_concept = hf_gen_image(prompt)
 
 # --------------------------------------
 # UI
@@ -223,41 +228,58 @@ prompt = st.text_area("Enter Topic")
 col1, col2 = st.columns(2)
 
 if col1.button("🚀 EXECUTE"):
-    res = Res()
+    res = AnalysisResults()
 
-    t1 = threading.Thread(target=thread_data, args=(res, prompt))
-    t2 = threading.Thread(target=thread_images, args=(res, prompt))
+    t1 = threading.Thread(target=thread_rca, args=(res, prompt))
+    t2 = threading.Thread(target=thread_meta, args=(res, prompt))
+    t3 = threading.Thread(target=thread_assets, args=(res, prompt))
 
-    t1.start(); t2.start()
-    t1.join(); t2.join()
+    t1.start(); t2.start(); t3.start()
+    t1.join(); t2.join(); t3.join()
 
-    # IMAGE PIPELINE
+    # --------------------------------------
+    # 🔥 FINAL IMAGE PIPELINE (FIXED)
+    # --------------------------------------
     final_images = []
 
-    if res.images:
-        for i in res.images[:3]:
-            url = i.get("thumbnail") or i.get("original")
+    # SERP
+    if res.market_photos:
+        for img in res.market_photos:
+            url = img.get("thumbnail") or img.get("original")
             if url:
                 final_images.append(url)
 
+    # HF
     while len(final_images) < 3:
-        img = hf_gen_image(prompt)
-        if img:
-            final_images.append(img)
+        ai_img = hf_gen_image(f"{prompt}, automotive seat design")
+        if ai_img:
+            final_images.append(ai_img)
         else:
             break
 
+    # fallback
     while len(final_images) < 3:
         final_images.append(f"https://source.unsplash.com/600x400/?car-seat,{len(final_images)}")
 
-    # 🔥 COUNTER FIX (ADDED)
-    st.session_state.count += len(final_images)
+    res.final_images = final_images
 
+    # --------------------------------------
     # DISPLAY
+    # --------------------------------------
     st.subheader("📊 Current Trends")
-    st.write(res.trend)
+    st.write(res.rca_intel)
 
-    specs = normalize_specs(safe_json_extract(res.specs))
+    if res.ai_concept:
+        st.image(res.ai_concept)
+
+    raw_specs = safe_json_extract(res.specs_raw)
+    specs = normalize_specs(raw_specs)
+
+    if not specs:
+        retry, _ = call_openrouter_with_fallback_requests(
+            f"Generate vendors JSON for {prompt}", OPENROUTER_API_KEY
+        )
+        specs = normalize_specs(safe_json_extract(retry))
 
     st.subheader("🔍 Technical Specs")
 
@@ -266,30 +288,25 @@ if col1.button("🚀 EXECUTE"):
         d = specs[i % len(specs)] if specs else {}
 
         with col:
-            brand = d.get("Brand", f"auto-{i}")
+            brand = d.get("Brand") or f"auto-seat-{i}"
+
             st.markdown(f"### {brand}")
+            st.write(f"**Vehicle:** {d.get('Vehicle')}")
 
-            if i < len(final_images):
-                st.image(final_images[i])
-
-            st.write(f"Vehicle: {d.get('Vehicle')}")
-            st.write(f"Material: {d.get('Material')}")
+            for k, v in d.items():
+                if k not in ["Vehicle", "Website"]:
+                    st.write(f"**{k}:** {v}")
 
             if d.get("Description"):
                 st.caption(d.get("Description"))
 
-            website = fetch_real_website(brand)
-            st.link_button("🌐 Visit Website", website + f"?ref={i}")
+            website = d.get("Website") or fetch_real_website(brand)
+            if website:
+                st.link_button("🌐 Visit Website", website + f"?ref={i}")
 
-    # 🔥 DOWNLOAD BUTTON (ADDED)
-    zip_data = create_download_package(prompt, res.trend, specs, final_images)
-
-    st.download_button(
-        "📥 Download Full Report",
-        data=zip_data,
-        file_name="pictator_report.zip",
-        mime="application/zip"
-    )
+            # 🔥 FIXED IMAGE DISPLAY
+            if hasattr(res, "final_images") and i < len(res.final_images):
+                st.image(res.final_images[i])
 
 # --------------------------------------
 # RENDER
