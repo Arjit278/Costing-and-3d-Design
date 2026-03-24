@@ -44,31 +44,34 @@ OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
 SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
-MODELS = ["meta-llama/llama-3.2-3b-instruct:free",
-          "openai/gpt-oss-120b:free",
-          "openai/gpt-oss-20b:free"
+# --------------------------------------
+# ⚡ FLASHMIND ENGINE (MULTI-MODEL)
+# --------------------------------------
+ANALYSIS_FALLBACK_MODELS = [
+    "openai/gpt-oss-20b:free",
+    "deepseek/deepseek-r1-distill-llama-70b:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "x-ai/grok-4.1-fast:free",
 ]
 
-# --------------------------------------
-# 🔥 OPENROUTER ENGINE (STRONGER + STABLE)
-# --------------------------------------
-def call_openrouter(prompt, retries=3):
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-    last_error = None
+def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
-    for attempt in range(retries):
+    for model in ANALYSIS_FALLBACK_MODELS:
         try:
             r = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_URL,
                 headers=headers,
                 json={
-                    "model": MODELS[0],
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.2
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "You are an automotive engineering expert."},
+                        {"role": "user", "content": prompt}
+                    ]
                 },
                 timeout=60
             )
@@ -80,16 +83,12 @@ def call_openrouter(prompt, retries=3):
                     return content.strip(), "OK"
 
             elif r.status_code == 429:
-                time.sleep(2 + attempt * 3)
-                last_error = "Rate Limit"
+                time.sleep(2)
 
-            else:
-                last_error = f"HTTP {r.status_code}"
+        except:
+            continue
 
-        except Exception as e:
-            last_error = str(e)
-
-    return None, last_error or "Timeout"
+    return None, "All models failed"
 
 # --------------------------------------
 # IMAGE ENGINE
@@ -104,11 +103,11 @@ def hf_gen_image(prompt):
         return None
 
 # --------------------------------------
-# THREADS
+# THREADS (UPDATED)
 # --------------------------------------
 def thread_rca(res, prompt):
     try:
-        output, status = call_openrouter(
+        output, status = call_openrouter_with_fallback_requests(
             f"""
             Generate current automotive trends for:
 
@@ -117,8 +116,8 @@ def thread_rca(res, prompt):
             - Strict domain match
             - Real materials
             - 5 bullet points
-            - Avoid generic output
-            """
+            """,
+            OPENROUTER_API_KEY
         )
         res.rca_intel = output
         res.rca_status = status
@@ -129,23 +128,23 @@ def thread_rca(res, prompt):
 
 def thread_meta(res, prompt):
     try:
-        result = call_openrouter(
+        result, status = call_openrouter_with_fallback_requests(
             f"""
-            Generate 3 real automotive vendors for:
+            Generate 3 REAL automotive vendors for:
 
             {prompt}
 
             Include:
             - Brand
             - Vehicle
-            - Material
+            - Material (match prompt)
             - Website
-            - Correct domain mapping
 
             Return JSON
-            """
+            """,
+            OPENROUTER_API_KEY
         )
-        res.specs_raw = result[0] if result else None
+        res.specs_raw = result
     except:
         res.specs_raw = None
 
@@ -193,45 +192,30 @@ if col1.button("🚀 EXECUTE"):
             t3.join(timeout=30)
 
         # --------------------------------------
-        # CURRENT TRENDS (SMART FALLBACK)
+        # CURRENT TRENDS
         # --------------------------------------
         if not res.rca_intel:
             st.warning(f"⚠️ Primary Engine Failed: {res.rca_status}")
 
-            trend_output, _ = call_openrouter(f"Generate trends for: {prompt}")
+            trend_output, _ = call_openrouter_with_fallback_requests(
+                f"Generate trends for: {prompt}",
+                OPENROUTER_API_KEY
+            )
 
-            if trend_output:
-                res.rca_intel = trend_output
-            else:
-                vehicles = []
-                for v in ["Grand Vitara", "Wagon R", "Swift", "Baleno"]:
-                    if v.lower() in prompt.lower():
-                        vehicles.append(v)
-
-                vehicle_text = ", ".join(vehicles) if vehicles else "target vehicles"
-
-                res.rca_intel = f"""
-Current Trends (Recovered Mode):
-
-• Seat design evolution in {vehicle_text} interiors  
-• Growing use of synthetic and PU leather materials  
-• Vertical stitching and broader ergonomics trending  
-• Cost-efficient premium upgrades in compact segments  
-• Focus on durability and low maintenance  
-"""
+            res.rca_intel = trend_output or "No trends available"
 
         st.subheader("📊 Current Trends")
         st.write(res.rca_intel)
 
         # --------------------------------------
-        # IMAGE + COUNTER
+        # IMAGE
         # --------------------------------------
         if res.ai_concept:
             st.image(res.ai_concept)
             st.session_state.count += 1
 
         # --------------------------------------
-        # SPECS (SMART FALLBACK)
+        # SPECS
         # --------------------------------------
         specs = []
         try:
@@ -242,7 +226,10 @@ Current Trends (Recovered Mode):
             specs = []
 
         if not specs:
-            ai_specs, _ = call_openrouter(f"Generate vendors for: {prompt} JSON")
+            ai_specs, _ = call_openrouter_with_fallback_requests(
+                f"Generate vendors for: {prompt} JSON",
+                OPENROUTER_API_KEY
+            )
 
             if ai_specs:
                 match = re.search(r"\[.*\]", ai_specs, re.DOTALL)
@@ -250,30 +237,7 @@ Current Trends (Recovered Mode):
                     specs = json.loads(match.group())
 
         if not specs:
-            topic = prompt.lower()
-
-            vehicles = []
-            for v in ["grand vitara", "wagon r", "swift", "baleno"]:
-                if v in topic:
-                    vehicles.append(v.title())
-
-            if not vehicles:
-                vehicles = ["Generic Model"]
-
-            materials = ["Synthetic Leather", "PU Leather", "Fabric"]
-            types = ["Vertical Stitch", "Broad Seat", "Ergonomic"]
-
-            specs = []
-            for i in range(3):
-                specs.append({
-                    "Brand": f"{vehicles[i % len(vehicles)]} Systems",
-                    "Vehicle": vehicles[i % len(vehicles)],
-                    "Country": "India / EU",
-                    "Type": random.choice(types),
-                    "Material": random.choice(materials),
-                    "Strength": "Segment Optimized",
-                    "Website": "N/A"
-                })
+            specs = [{"Brand": "Fallback System", "Vehicle": "Concept", "Material": "Synthetic"}]
 
         # --------------------------------------
         # DISPLAY
@@ -291,7 +255,7 @@ Current Trends (Recovered Mode):
                     if k not in ["Vehicle", "Website"]:
                         st.write(f"**{k}:** {v}")
 
-                if d.get("Website") and d.get("Website") != "N/A":
+                if d.get("Website"):
                     st.link_button("🌐 Visit Website", d.get("Website"))
 
                 if i < len(res.market_photos):
