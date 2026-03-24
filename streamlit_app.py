@@ -9,6 +9,36 @@ import random
 from PIL import Image
 
 # --------------------------------------
+# 🔐 LOGIN SYSTEM (ADDED - NO REMOVAL)
+# --------------------------------------
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+with st.sidebar:
+    st.title("🔐 Access Panel")
+
+    if not st.session_state.authenticated:
+        user = st.text_input("Username")
+        pwd = st.text_input("Password", type="password")
+
+        if st.button("Login"):
+            if user == "Harmony" and pwd == "Harmony_Pictator123":
+                st.session_state.authenticated = True
+                st.success("✅ Logged in")
+                st.rerun()
+            else:
+                st.error("❌ Invalid credentials")
+    else:
+        st.success("🟢 Logged in as Harmony")
+        if st.button("🚪 Logout"):
+            st.session_state.authenticated = False
+            st.rerun()
+
+if not st.session_state.authenticated:
+    st.warning("🔐 Please login from sidebar to continue")
+    st.stop()
+
+# --------------------------------------
 # 🔧 PAGE CONFIG
 # --------------------------------------
 st.set_page_config(page_title="Pictator Pro", page_icon="🏎️", layout="wide")
@@ -25,6 +55,30 @@ if "count" not in st.session_state:
 st.sidebar.title("🔐 Control Panel")
 st.sidebar.metric("🖼️ Images Generated", st.session_state.count)
 st.sidebar.markdown("---")
+
+# --------------------------------------
+# 🌐 WEBSITE FETCH (NEW ADDITION)
+# --------------------------------------
+def fetch_real_website(brand):
+    try:
+        r = requests.get(
+            "https://serpapi.com/search",
+            params={
+                "engine": "google",
+                "q": f"{brand} official website",
+                "api_key": SERP_API_KEY
+            },
+            timeout=5
+        )
+        results = r.json().get("organic_results", [])
+        if results:
+            return results[0].get("link")
+    except:
+        pass
+
+    # fallback
+    clean = brand.lower().replace(" ", "").replace("-", "")
+    return f"https://www.{clean}.com"
 
 # --------------------------------------
 # RESULT CONTAINER
@@ -109,7 +163,7 @@ def safe_json_extract(text):
     return []
 
 # --------------------------------------
-# 🔥 NORMALIZER (NEW PATCH)
+# NORMALIZER
 # --------------------------------------
 def normalize_specs(specs):
     normalized = []
@@ -168,9 +222,6 @@ def thread_meta(res, prompt):
         {prompt}
 
         Return STRICT JSON ONLY.
-        No explanation.
-        No text before or after.
-        Valid JSON array format only.
         """,
         OPENROUTER_API_KEY
     )
@@ -211,57 +262,28 @@ if col1.button("🚀 EXECUTE"):
             t2 = threading.Thread(target=thread_meta, args=(res, prompt))
             t3 = threading.Thread(target=thread_assets, args=(res, prompt))
 
-            t1.start()
-            t2.start()
-            t3.start()
-
+            t1.start(); t2.start(); t3.start()
             t1.join(timeout=40)
             t2.join(timeout=25)
             t3.join(timeout=30)
 
-        # --------------------------------------
-        # CURRENT TRENDS
-        # --------------------------------------
-        if not res.rca_intel:
-            st.warning(f"⚠️ Primary Engine Failed: {res.rca_status}")
-            trend_output, _ = call_openrouter_with_fallback_requests(
-                f"Generate trends for: {prompt}",
-                OPENROUTER_API_KEY
-            )
-            res.rca_intel = trend_output or "No trends available"
-
         st.subheader("📊 Current Trends")
         st.write(res.rca_intel)
 
-        # --------------------------------------
-        # IMAGE
-        # --------------------------------------
         if res.ai_concept:
             st.image(res.ai_concept)
             st.session_state.count += 1
 
-        # --------------------------------------
-        # SPECS (FIXED)
-        # --------------------------------------
         raw_specs = safe_json_extract(res.specs_raw)
         specs = normalize_specs(raw_specs)
-
-        if not isinstance(specs, list):
-            specs = []
 
         if not specs:
             specs = [{
                 "Brand": "Recaro",
                 "Vehicle": "Grand Vitara",
-                "Type": "Ergonomic Seat",
-                "Material": "Synthetic Leather",
-                "Strength": "High Durability",
-                "Description": "Vertical + broad seat design optimized for comfort"
+                "Material": "Synthetic Leather"
             }]
 
-        # --------------------------------------
-        # DISPLAY
-        # --------------------------------------
         st.subheader("🔍 Technical Specs")
 
         cols = st.columns(3)
@@ -278,8 +300,10 @@ if col1.button("🚀 EXECUTE"):
                 if d.get("Description"):
                     st.caption(d.get("Description"))
 
-                if d.get("Website"):
-                    st.link_button("🌐 Visit Website", d.get("Website"))
+                website = d.get("Website") or fetch_real_website(d.get("Brand"))
+
+                if website:
+                    st.link_button("🌐 Visit Website", website)
 
                 if i < len(res.market_photos):
                     img_url = res.market_photos[i].get("thumbnail") or res.market_photos[i].get("original")
