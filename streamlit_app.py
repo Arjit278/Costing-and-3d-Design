@@ -96,6 +96,7 @@ class AnalysisResults:
         self.market_photos = []
         self.ai_concept = None
         self.rca_status = "OK"
+        self.final_images = []
 
 # --------------------------------------
 # ⚡ FLASHMIND ENGINE
@@ -165,11 +166,9 @@ def safe_json_extract(text):
 # --------------------------------------
 def normalize_specs(specs):
     normalized = []
-
     for item in specs:
         if not isinstance(item, dict):
             continue
-
         normalized.append({
             "Brand": item.get("Brand") or item.get("vendor") or "Unknown",
             "Vehicle": item.get("Vehicle") or (item.get("compatibility")[0] if item.get("compatibility") else "Generic"),
@@ -179,7 +178,6 @@ def normalize_specs(specs):
             "Description": item.get("description") or "",
             "Website": item.get("Website") or ""
         })
-
     return normalized
 
 # --------------------------------------
@@ -217,7 +215,6 @@ def thread_assets(res, prompt):
         res.market_photos = r.json().get("images_results", [])[:3]
     except:
         res.market_photos = []
-
     res.ai_concept = hf_gen_image(prompt)
 
 # --------------------------------------
@@ -241,15 +238,12 @@ if col1.button("🚀 EXECUTE"):
     # 🔥 FINAL IMAGE PIPELINE (FIXED)
     # --------------------------------------
     final_images = []
-
-    # SERP
     if res.market_photos:
-        for img in res.market_photos:
-            url = img.get("thumbnail") or img.get("original")
+        for img_data in res.market_photos:
+            url = img_data.get("thumbnail") or img_data.get("original")
             if url:
                 final_images.append(url)
 
-    # HF
     while len(final_images) < 3:
         ai_img = hf_gen_image(f"{prompt}, automotive seat design")
         if ai_img:
@@ -257,7 +251,6 @@ if col1.button("🚀 EXECUTE"):
         else:
             break
 
-    # fallback
     while len(final_images) < 3:
         final_images.append(f"https://source.unsplash.com/600x400/?car-seat,{len(final_images)}")
 
@@ -271,6 +264,10 @@ if col1.button("🚀 EXECUTE"):
 
     if res.ai_concept:
         st.image(res.ai_concept)
+        # --- PATCH: DOWNLOAD CONCEPT ---
+        buf_concept = io.BytesIO()
+        res.ai_concept.save(buf_concept, format="PNG")
+        st.download_button("💾 Save Concept Image", buf_concept.getvalue(), "concept.png", "image/png")
 
     raw_specs = safe_json_extract(res.specs_raw)
     specs = normalize_specs(raw_specs)
@@ -281,22 +278,23 @@ if col1.button("🚀 EXECUTE"):
         )
         specs = normalize_specs(safe_json_extract(retry))
 
+    # --- PATCH: DOWNLOAD TEXT REPORT ---
+    report_text = f"ANALYSIS: {prompt}\n\nTRENDS:\n{res.rca_intel}\n\nSPECS:\n{json.dumps(specs, indent=2)}"
+    st.sidebar.download_button("📄 Download Full Report", report_text, f"report_{prompt[:10]}.txt", "text/plain")
+
     st.subheader("🔍 Technical Specs")
 
     cols = st.columns(3)
     for i, col in enumerate(cols):
         d = specs[i % len(specs)] if specs else {}
-
         with col:
             brand = d.get("Brand") or f"auto-seat-{i}"
-
             st.markdown(f"### {brand}")
             st.write(f"**Vehicle:** {d.get('Vehicle')}")
-
             for k, v in d.items():
                 if k not in ["Vehicle", "Website"]:
                     st.write(f"**{k}:** {v}")
-
+            
             if d.get("Description"):
                 st.caption(d.get("Description"))
 
@@ -304,14 +302,24 @@ if col1.button("🚀 EXECUTE"):
             if website:
                 st.link_button("🌐 Visit Website", website + f"?ref={i}")
 
-            # 🔥 FIXED IMAGE DISPLAY
-            if hasattr(res, "final_images") and i < len(res.final_images):
-                st.image(res.final_images[i])
+            if i < len(res.final_images):
+                img_src = res.final_images[i]
+                st.image(img_src)
+                # --- PATCH: DOWNLOAD SPEC IMAGE ---
+                if isinstance(img_src, Image.Image):
+                    buf_spec = io.BytesIO()
+                    img_src.save(buf_spec, format="PNG")
+                    st.download_button(f"📥 Save {brand} Image", buf_spec.getvalue(), f"{brand}.png", "image/png", key=f"dl_{i}")
 
 # --------------------------------------
 # RENDER
 # --------------------------------------
 if col2.button("🎨 RENDER"):
-    img = hf_gen_image(f"{prompt}, ultra realistic, 8k")
-    if img:
-        st.image(img)
+    img_render = hf_gen_image(f"{prompt}, ultra realistic, 8k")
+    if img_render:
+        st.image(img_render)
+        st.session_state.count += 1
+        # --- PATCH: DOWNLOAD RENDER ---
+        buf_render = io.BytesIO()
+        img_render.save(buf_render, format="PNG")
+        st.download_button("🖼️ Save 8K Render", buf_render.getvalue(), "render_8k.png", "image/png")
