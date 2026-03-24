@@ -3,7 +3,6 @@ import json
 import requests
 import streamlit as st
 import re
-import time
 import threading
 from PIL import Image
 
@@ -37,15 +36,13 @@ class AnalysisResults:
         self.rca_status = "OK"
 
 # --------------------------------------
-# API CONFIG
+# API CONFIG (UPDATED)
 # --------------------------------------
-OPENROUTER_API_KEY = "YOUR_KEY"
+OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
 SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
-MODELS = [
-    "meta-llama/llama-3.2-3b-instruct:free"
-]
+MODELS = ["meta-llama/llama-3.2-3b-instruct:free"]
 
 # --------------------------------------
 # OPENROUTER ENGINE
@@ -103,15 +100,15 @@ def thread_rca(res, prompt):
     try:
         output, status = call_openrouter(
             f"""
-            Generate current automotive trends based on:
+            Generate current automotive trends for:
 
             {prompt}
 
-            Requirements:
-            - Must match topic exactly
-            - No unrelated materials
-            - Use correct domain (lighting, seats, electronics etc.)
-            - 5 bullet points only
+            Rules:
+            - Strictly match domain
+            - Use real technologies/materials
+            - 5 bullet points
+            - No generic statements
             """
         )
         res.rca_intel = output
@@ -125,14 +122,15 @@ def thread_meta(res, prompt):
     try:
         result = call_openrouter(
             f"""
-            Generate 3 automotive specifications based on:
+            Generate 3 real automotive vendors based on:
 
             {prompt}
 
             Requirements:
-            - Include Vehicle
-            - Use correct materials for topic
-            - Real brands or OEM suppliers
+            - Real companies (Bosch, Valeo, Hella, Lear, Faurecia, etc.)
+            - Correct domain materials
+            - Include vehicle examples
+            - Include official website links
 
             Return JSON:
             [
@@ -142,7 +140,8 @@ def thread_meta(res, prompt):
                 "Country": "",
                 "Type": "",
                 "Material": "",
-                "Strength": ""
+                "Strength": "",
+                "Website": ""
               }}
             ]
             """
@@ -195,21 +194,13 @@ if col1.button("🚀 EXECUTE"):
             t3.join(timeout=35)
 
         # --------------------------------------
-        # CURRENT TRENDS (DYNAMIC)
+        # CURRENT TRENDS (FULLY DYNAMIC)
         # --------------------------------------
         if not res.rca_intel:
             st.warning(f"⚠️ Primary Engine Failed: {res.rca_status}")
 
-            # 🔥 dynamic fallback
-            res.rca_intel = f"""
-Current Trends Insight (Generated Fallback):
-
-• Innovations evolving in: {prompt}
-• Material optimization based on component function  
-• Increased focus on efficiency and durability  
-• Smart integration with electronics and sensors  
-• European manufacturing adapting to modular design  
-"""
+            trend_output, _ = call_openrouter(f"Generate trends for: {prompt}")
+            res.rca_intel = trend_output or f"No trends available for: {prompt}"
 
         st.subheader("📊 Current Trends")
         st.write(res.rca_intel)
@@ -222,7 +213,7 @@ Current Trends Insight (Generated Fallback):
             st.session_state.count += 1
 
         # --------------------------------------
-        # SPECS (FULLY DYNAMIC)
+        # SPECS
         # --------------------------------------
         specs = []
         try:
@@ -232,35 +223,30 @@ Current Trends Insight (Generated Fallback):
         except:
             specs = []
 
-        # 🔥 AI FALLBACK (SECONDARY)
+        # FINAL DYNAMIC FALLBACK
         if not specs:
-            try:
-                fallback_prompt = f"""
-                Generate 3 automotive specs based on:
+            fallback_prompt = f"Generate automotive vendors for: {prompt} with JSON"
+            ai_specs, _ = call_openrouter(fallback_prompt)
 
-                {prompt}
+            if ai_specs:
+                match = re.search(r"\[.*\]", ai_specs, re.DOTALL)
+                if match:
+                    specs = json.loads(match.group())
 
-                Must match topic exactly.
-                Return JSON only.
-                """
-
-                ai_specs, _ = call_openrouter(fallback_prompt)
-
-                if ai_specs:
-                    match = re.search(r"\[.*\]", ai_specs, re.DOTALL)
-                    if match:
-                        specs = json.loads(match.group())
-            except:
-                specs = []
-
-        # 🔥 FINAL SAFE FALLBACK
         if not specs:
-            specs = [
-                {"Brand": "Generic Auto", "Vehicle": "Concept Model", "Country": "EU", "Type": "Adaptive System", "Material": "Component-specific", "Strength": "Standard"},
-                {"Brand": "NextGen Mobility", "Vehicle": "Prototype", "Country": "Germany", "Type": "Smart Module", "Material": "Optimized Material", "Strength": "Balanced"},
-                {"Brand": "Future AutoTech", "Vehicle": "Platform X", "Country": "France", "Type": "Integrated System", "Material": "Advanced Composite", "Strength": "High Efficiency"},
-            ]
+            specs = [{
+                "Brand": f"{prompt[:20]} Systems",
+                "Vehicle": "Concept Platform",
+                "Country": "EU",
+                "Type": "Adaptive",
+                "Material": "Context-Based",
+                "Strength": "Standard",
+                "Website": "N/A"
+            }]
 
+        # --------------------------------------
+        # DISPLAY
+        # --------------------------------------
         st.subheader("🔍 Technical Specs")
 
         cols = st.columns(3)
@@ -270,8 +256,11 @@ Current Trends Insight (Generated Fallback):
                 st.markdown(f"### {d.get('Brand')}")
                 st.write(f"**Vehicle:** {d.get('Vehicle')}")
                 for k, v in d.items():
-                    if k != "Vehicle":
+                    if k not in ["Vehicle", "Website"]:
                         st.write(f"**{k}:** {v}")
+
+                if d.get("Website") and d.get("Website") != "N/A":
+                    st.link_button("🌐 Visit Website", d.get("Website"))
 
                 if i < len(res.market_photos):
                     st.image(res.market_photos[i]["thumbnail"])
