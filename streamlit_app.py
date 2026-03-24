@@ -87,16 +87,6 @@ def fetch_real_website(brand):
     return f"https://www.{clean}.com"
 
 # --------------------------------------
-# 🖼️ IMAGE FALLBACK
-# --------------------------------------
-def generate_fallback_images(prompt):
-    fallback = []
-    for i in range(3):
-        url = f"https://source.unsplash.com/600x400/?car-seat,{i},{prompt.replace(' ', '%20')}"
-        fallback.append({"thumbnail": url})
-    return fallback
-
-# --------------------------------------
 # RESULT CONTAINER
 # --------------------------------------
 class AnalysisResults:
@@ -193,7 +183,7 @@ def normalize_specs(specs):
     return normalized
 
 # --------------------------------------
-# IMAGE ENGINE
+# IMAGE ENGINE (HF)
 # --------------------------------------
 def hf_gen_image(prompt):
     try:
@@ -247,10 +237,35 @@ if col1.button("🚀 EXECUTE"):
     t1.start(); t2.start(); t3.start()
     t1.join(); t2.join(); t3.join()
 
-    # ensure images
-    if not res.market_photos or len(res.market_photos) < 3:
-        res.market_photos = generate_fallback_images(prompt)
+    # --------------------------------------
+    # 🔥 FINAL IMAGE PIPELINE (FIXED)
+    # --------------------------------------
+    final_images = []
 
+    # SERP
+    if res.market_photos:
+        for img in res.market_photos:
+            url = img.get("thumbnail") or img.get("original")
+            if url:
+                final_images.append(url)
+
+    # HF
+    while len(final_images) < 3:
+        ai_img = hf_gen_image(f"{prompt}, automotive seat design")
+        if ai_img:
+            final_images.append(ai_img)
+        else:
+            break
+
+    # fallback
+    while len(final_images) < 3:
+        final_images.append(f"https://source.unsplash.com/600x400/?car-seat,{len(final_images)}")
+
+    res.final_images = final_images
+
+    # --------------------------------------
+    # DISPLAY
+    # --------------------------------------
     st.subheader("📊 Current Trends")
     st.write(res.rca_intel)
 
@@ -260,7 +275,6 @@ if col1.button("🚀 EXECUTE"):
     raw_specs = safe_json_extract(res.specs_raw)
     specs = normalize_specs(raw_specs)
 
-    # AI retry only (no static)
     if not specs:
         retry, _ = call_openrouter_with_fallback_requests(
             f"Generate vendors JSON for {prompt}", OPENROUTER_API_KEY
@@ -286,19 +300,13 @@ if col1.button("🚀 EXECUTE"):
             if d.get("Description"):
                 st.caption(d.get("Description"))
 
-            # unique website
-            website = d.get("Website")
-            if not website:
-                website = fetch_real_website(brand)
-
+            website = d.get("Website") or fetch_real_website(brand)
             if website:
-                website = website + f"?ref={i}"
-                st.link_button("🌐 Visit Website", website)
+                st.link_button("🌐 Visit Website", website + f"?ref={i}")
 
-            if i < len(res.market_photos):
-                img = res.market_photos[i].get("thumbnail") or res.market_photos[i].get("original")
-                if img:
-                    st.image(img)
+            # 🔥 FIXED IMAGE DISPLAY
+            if hasattr(res, "final_images") and i < len(res.final_images):
+                st.image(res.final_images[i])
 
 # --------------------------------------
 # RENDER
