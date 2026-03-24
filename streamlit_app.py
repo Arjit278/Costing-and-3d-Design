@@ -6,6 +6,7 @@ import re
 import threading
 import time
 import random
+import zipfile  # NEW: For ZIP functionality
 from PIL import Image
 
 # --------------------------------------
@@ -227,12 +228,14 @@ col1, col2 = st.columns(2)
 if col1.button("🚀 EXECUTE"):
     res = AnalysisResults()
 
-    t1 = threading.Thread(target=thread_rca, args=(res, prompt))
-    t2 = threading.Thread(target=thread_meta, args=(res, prompt))
-    t3 = threading.Thread(target=thread_assets, args=(res, prompt))
+    with st.status("🚀 Engineering Data...", expanded=True) as status:
+        t1 = threading.Thread(target=thread_rca, args=(res, prompt))
+        t2 = threading.Thread(target=thread_meta, args=(res, prompt))
+        t3 = threading.Thread(target=thread_assets, args=(res, prompt))
 
-    t1.start(); t2.start(); t3.start()
-    t1.join(); t2.join(); t3.join()
+        t1.start(); t2.start(); t3.start()
+        t1.join(); t2.join(); t3.join()
+        status.update(label="✅ Analysis Complete", state="complete")
 
     # --------------------------------------
     # 🔥 FINAL IMAGE PIPELINE (FIXED)
@@ -255,6 +258,27 @@ if col1.button("🚀 EXECUTE"):
         final_images.append(f"https://source.unsplash.com/600x400/?car-seat,{len(final_images)}")
 
     res.final_images = final_images
+
+    # --------------------------------------
+    # 📦 DOWNLOAD ALL LOGIC (ZIP)
+    # --------------------------------------
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w") as zf:
+        # Report
+        report = f"TOPIC: {prompt}\n\nTRENDS:\n{res.rca_intel}\n\nSPECS:\n{res.specs_raw}"
+        zf.writestr("full_report.txt", report)
+        # Images
+        if res.ai_concept:
+            img_byte = io.BytesIO()
+            res.ai_concept.save(img_byte, format="PNG")
+            zf.writestr("concept_design.png", img_byte.getvalue())
+        for idx, img_obj in enumerate(res.final_images):
+            if isinstance(img_obj, Image.Image):
+                img_byte = io.BytesIO()
+                img_obj.save(img_byte, format="PNG")
+                zf.writestr(f"spec_image_{idx}.png", img_byte.getvalue())
+    
+    st.sidebar.download_button("📦 Download All Files (ZIP)", zip_buf.getvalue(), "Pictator_Package.zip", "application/zip")
 
     # --------------------------------------
     # DISPLAY
@@ -312,14 +336,15 @@ if col1.button("🚀 EXECUTE"):
                     st.download_button(f"📥 Save {brand} Image", buf_spec.getvalue(), f"{brand}.png", "image/png", key=f"dl_{i}")
 
 # --------------------------------------
-# RENDER
+# RENDER (FAST STREAMING STYLE)
 # --------------------------------------
 if col2.button("🎨 RENDER"):
-    img_render = hf_gen_image(f"{prompt}, ultra realistic, 8k")
-    if img_render:
-        st.image(img_render)
-        st.session_state.count += 1
-        # --- PATCH: DOWNLOAD RENDER ---
-        buf_render = io.BytesIO()
-        img_render.save(buf_render, format="PNG")
-        st.download_button("🖼️ Save 8K Render", buf_render.getvalue(), "render_8k.png", "image/png")
+    with st.spinner("🎨 Fast Rendering 8K Intel..."):
+        img_render = hf_gen_image(f"{prompt}, ultra realistic, 8k, photorealistic automotive engineering")
+        if img_render:
+            st.image(img_render)
+            st.session_state.count += 1
+            # --- PATCH: DOWNLOAD RENDER ---
+            buf_render = io.BytesIO()
+            img_render.save(buf_render, format="PNG")
+            st.download_button("🖼️ Save 8K Render", buf_render.getvalue(), "render_8k.png", "image/png")
