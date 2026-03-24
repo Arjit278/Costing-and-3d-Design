@@ -46,7 +46,7 @@ HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 MODELS = ["meta-llama/llama-3.2-3b-instruct:free"]
 
 # --------------------------------------
-# 🔥 OPENROUTER ENGINE (WITH RETRY + BACKOFF)
+# 🔥 OPENROUTER ENGINE (RETRY + BACKOFF)
 # --------------------------------------
 def call_openrouter(prompt, retries=3):
     headers = {
@@ -76,7 +76,7 @@ def call_openrouter(prompt, retries=3):
                     return content.strip(), "OK"
 
             elif r.status_code == 429:
-                time.sleep(2 + attempt * 2)  # 🔥 backoff
+                time.sleep(2 + attempt * 2)
                 last_error = "Rate Limit"
 
             else:
@@ -110,9 +110,8 @@ def thread_rca(res, prompt):
 
             {prompt}
 
-            Rules:
-            - Strictly match domain
-            - Use real technologies/materials
+            - Strict domain match
+            - Real materials
             - 5 bullet points
             """
         )
@@ -127,22 +126,17 @@ def thread_meta(res, prompt):
     try:
         result = call_openrouter(
             f"""
-            Generate 3 real automotive vendors based on:
+            Generate 3 real automotive vendors for:
 
             {prompt}
 
-            Return JSON:
-            [
-              {{
-                "Brand": "",
-                "Vehicle": "",
-                "Country": "",
-                "Type": "",
-                "Material": "",
-                "Strength": "",
-                "Website": ""
-              }}
-            ]
+            Include:
+            - Brand
+            - Vehicle
+            - Material
+            - Website
+
+            Return JSON
             """
         )
         res.specs_raw = result[0] if result else None
@@ -188,13 +182,13 @@ if col1.button("🚀 EXECUTE"):
             t2.start()
             t3.start()
 
-            # ✅ EXACT PATCH YOU ASKED
+            # ✅ EXACT PATCH YOU REQUESTED
             t1.join(timeout=40)
             t2.join(timeout=25)
             t3.join(timeout=30)
 
         # --------------------------------------
-        # CURRENT TRENDS (INDEPENDENT ENGINE PATCH)
+        # CURRENT TRENDS (INDEPENDENT ENGINE)
         # --------------------------------------
         if not res.rca_intel:
             st.warning(f"⚠️ Primary Engine Failed: {res.rca_status}")
@@ -220,8 +214,8 @@ Current Trends (Recovered Mode):
 • Design focus evolving around: {prompt[:60]}
 • Materials aligned with functional performance  
 • OEM customization increasing  
-• Smart integration rising  
-• European manufacturing adapting  
+• Smart integration of components  
+• EU manufacturing adapting to demand  
 """
 
         st.subheader("📊 Current Trends")
@@ -235,7 +229,7 @@ Current Trends (Recovered Mode):
             st.session_state.count += 1
 
         # --------------------------------------
-        # SPECS (INDEPENDENT PATCH)
+        # SPECS (INDEPENDENT RECOVERY)
         # --------------------------------------
         specs = []
         try:
@@ -245,6 +239,7 @@ Current Trends (Recovered Mode):
         except:
             specs = []
 
+        # 🔥 independent retry
         if not specs:
             ai_specs, _ = call_openrouter(
                 f"""
@@ -252,7 +247,6 @@ Current Trends (Recovered Mode):
 
                 {prompt}
 
-                Include materials + vehicles
                 Return JSON
                 """
             )
@@ -262,13 +256,14 @@ Current Trends (Recovered Mode):
                 if match:
                     specs = json.loads(match.group())
 
+        # FINAL fallback
         if not specs:
             specs = [{
                 "Brand": f"{prompt[:20]} Systems",
-                "Vehicle": "Concept Platform",
+                "Vehicle": "Concept",
                 "Country": "EU",
                 "Type": "Adaptive",
-                "Material": "Context-Based",
+                "Material": "Context",
                 "Strength": "Standard",
                 "Website": "N/A"
             }]
@@ -284,6 +279,7 @@ Current Trends (Recovered Mode):
             with col:
                 st.markdown(f"### {d.get('Brand')}")
                 st.write(f"**Vehicle:** {d.get('Vehicle')}")
+
                 for k, v in d.items():
                     if k not in ["Vehicle", "Website"]:
                         st.write(f"**{k}:** {v}")
