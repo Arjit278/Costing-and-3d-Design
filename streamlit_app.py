@@ -4,6 +4,7 @@ import requests
 import streamlit as st
 import re
 import threading
+import time
 from PIL import Image
 
 # --------------------------------------
@@ -36,7 +37,7 @@ class AnalysisResults:
         self.rca_status = "OK"
 
 # --------------------------------------
-# API CONFIG (UPDATED)
+# API CONFIG
 # --------------------------------------
 OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
 SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
@@ -45,9 +46,9 @@ HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 MODELS = ["meta-llama/llama-3.2-3b-instruct:free"]
 
 # --------------------------------------
-# OPENROUTER ENGINE
+# 🔥 OPENROUTER ENGINE (WITH RETRY + BACKOFF)
 # --------------------------------------
-def call_openrouter(prompt):
+def call_openrouter(prompt, retries=3):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
@@ -55,13 +56,13 @@ def call_openrouter(prompt):
 
     last_error = None
 
-    for model in MODELS:
+    for attempt in range(retries):
         try:
             r = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers=headers,
                 json={
-                    "model": model,
+                    "model": MODELS[0],
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.3
                 },
@@ -73,6 +74,11 @@ def call_openrouter(prompt):
                 content = data.get("choices", [{}])[0].get("message", {}).get("content")
                 if content:
                     return content.strip(), "OK"
+
+            elif r.status_code == 429:
+                time.sleep(2 + attempt * 2)  # 🔥 backoff
+                last_error = "Rate Limit"
+
             else:
                 last_error = f"HTTP {r.status_code}"
 
@@ -108,7 +114,6 @@ def thread_rca(res, prompt):
             - Strictly match domain
             - Use real technologies/materials
             - 5 bullet points
-            - No generic statements
             """
         )
         res.rca_intel = output
@@ -125,12 +130,6 @@ def thread_meta(res, prompt):
             Generate 3 real automotive vendors based on:
 
             {prompt}
-
-            Requirements:
-            - Real companies (Bosch, Valeo, Hella, Lear, Faurecia, etc.)
-            - Correct domain materials
-            - Include vehicle examples
-            - Include official website links
 
             Return JSON:
             [
@@ -189,18 +188,41 @@ if col1.button("🚀 EXECUTE"):
             t2.start()
             t3.start()
 
-            t1.join(timeout=45)
+            # ✅ EXACT PATCH YOU ASKED
+            t1.join(timeout=40)
             t2.join(timeout=25)
-            t3.join(timeout=35)
+            t3.join(timeout=30)
 
         # --------------------------------------
-        # CURRENT TRENDS (FULLY DYNAMIC)
+        # CURRENT TRENDS (INDEPENDENT ENGINE PATCH)
         # --------------------------------------
         if not res.rca_intel:
             st.warning(f"⚠️ Primary Engine Failed: {res.rca_status}")
 
-            trend_output, _ = call_openrouter(f"Generate trends for: {prompt}")
-            res.rca_intel = trend_output or f"No trends available for: {prompt}"
+            trend_output, trend_status = call_openrouter(
+                f"""
+                Generate automotive trends specifically for:
+
+                {prompt}
+
+                - Must match topic exactly
+                - Mention real materials and design patterns
+                - 5 bullet points
+                """
+            )
+
+            if trend_output:
+                res.rca_intel = trend_output
+            else:
+                res.rca_intel = f"""
+Current Trends (Recovered Mode):
+
+• Design focus evolving around: {prompt[:60]}
+• Materials aligned with functional performance  
+• OEM customization increasing  
+• Smart integration rising  
+• European manufacturing adapting  
+"""
 
         st.subheader("📊 Current Trends")
         st.write(res.rca_intel)
@@ -213,7 +235,7 @@ if col1.button("🚀 EXECUTE"):
             st.session_state.count += 1
 
         # --------------------------------------
-        # SPECS
+        # SPECS (INDEPENDENT PATCH)
         # --------------------------------------
         specs = []
         try:
@@ -223,10 +245,17 @@ if col1.button("🚀 EXECUTE"):
         except:
             specs = []
 
-        # FINAL DYNAMIC FALLBACK
         if not specs:
-            fallback_prompt = f"Generate automotive vendors for: {prompt} with JSON"
-            ai_specs, _ = call_openrouter(fallback_prompt)
+            ai_specs, _ = call_openrouter(
+                f"""
+                Generate 3 REAL automotive vendors for:
+
+                {prompt}
+
+                Include materials + vehicles
+                Return JSON
+                """
+            )
 
             if ai_specs:
                 match = re.search(r"\[.*\]", ai_specs, re.DOTALL)
