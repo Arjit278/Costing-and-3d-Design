@@ -44,7 +44,10 @@ OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
 SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
-MODELS = ["meta-llama/llama-3.2-3b-instruct:free"]
+MODELS = ["meta-llama/llama-3.2-3b-instruct:free",
+          "openai/gpt-oss-120b:free",
+          "openai/gpt-oss-20b:free"
+]
 
 # --------------------------------------
 # 🔥 OPENROUTER ENGINE (STRONGER + STABLE)
@@ -67,7 +70,7 @@ def call_openrouter(prompt, retries=3):
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.2
                 },
-                timeout=35
+                timeout=60
             )
 
             if r.status_code == 200:
