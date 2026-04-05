@@ -419,7 +419,7 @@ if col1.button("🚀 EXECUTE"):
         st.download_button("💾 Save Concept Image", buf_concept.getvalue(), "concept.png", "image/png")
 
     raw_specs = safe_json_extract(res.specs_raw)
-    specs = normalize_specs(raw_specs)
+    specs = normalize_specs(raw_specs, prompt)
     st.write("RAW LLM OUTPUT:", res.specs_raw)
 
     if not specs or all(d.get("Brand") == "Unknown" for d in specs):
