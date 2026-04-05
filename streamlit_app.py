@@ -47,6 +47,7 @@ if "admin_logs" not in st.session_state:
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🛠 Admin Panel")
+st.sidebar.metric("🌍 Total Images (All Users)", st.session_state.global_count)
 
 if st.sidebar.checkbox("View Raw LLM Logs"):
     for log in reversed(st.session_state.admin_logs[-10:]):
@@ -70,7 +71,7 @@ if "count" not in st.session_state:
     st.session_state.count = 0
 
 st.sidebar.title("🔐 Control Panel")
-st.sidebar.metric("🖼️ Images Generated", st.session_state.count)
+st.sidebar.metric("🧑 Your Generated Images", st.session_state.count)
 st.sidebar.markdown("---")
 
 # --------------------------------------
@@ -520,6 +521,7 @@ if col2.button("🎨 RENDER"):
         if img_render:
             st.image(img_render)
             st.session_state.count += 1
+            st.session_state.global_count += 1
             # --- PATCH: DOWNLOAD RENDER ---
             buf_render = io.BytesIO()
             img_render.save(buf_render, format="PNG")
