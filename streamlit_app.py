@@ -38,7 +38,23 @@ with st.sidebar:
 if not st.session_state.authenticated:
     st.warning("🔐 Please login from sidebar to continue")
     st.stop()
+    
+# --------------------------------------
+# 🧠 ADMIN DATA STORE
+# --------------------------------------
+if "admin_logs" not in st.session_state:
+    st.session_state.admin_logs = []
 
+st.sidebar.markdown("---")
+st.sidebar.subheader("🛠 Admin Panel")
+
+if st.sidebar.checkbox("View Raw LLM Logs"):
+    for log in reversed(st.session_state.admin_logs[-10:]):
+        st.sidebar.text(f"{log['timestamp']} | {log['prompt']}")
+        st.sidebar.code(log["raw_output"])
+
+if "global_count" not in st.session_state:
+    st.session_state.global_count = 0
 # --------------------------------------
 # 🔧 PAGE CONFIG
 # --------------------------------------
@@ -383,7 +399,11 @@ if col1.button("🚀 EXECUTE"):
         final_images.append(fallback_query)
     
     res.final_images = final_images
-
+    # ✅ Count generated images
+    generated_count = len(res.final_images)
+    
+    st.session_state.count += generated_count
+    st.session_state.global_count += generated_count
     # --------------------------------------
     # 📦 DOWNLOAD ALL LOGIC (ZIP)
     # --------------------------------------
@@ -419,9 +439,14 @@ if col1.button("🚀 EXECUTE"):
         st.download_button("💾 Save Concept Image", buf_concept.getvalue(), "concept.png", "image/png")
 
     raw_specs = safe_json_extract(res.specs_raw)
+    # 🔐 Store raw LLM output for admin
+    st.session_state.admin_logs.append({
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "prompt": prompt,
+        "raw_output": res.specs_raw
+    })
     specs = normalize_specs(raw_specs, prompt)
-    st.write("RAW LLM OUTPUT:", res.specs_raw)
-
+    
     if not specs or all(d.get("Brand") == "Unknown" for d in specs):
         specs = [
             {
