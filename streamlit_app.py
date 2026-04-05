@@ -164,23 +164,109 @@ def safe_json_extract(text):
 # --------------------------------------
 # NORMALIZER
 # --------------------------------------
-def normalize_specs(specs):
+def normalize_specs(specs, prompt=""):
     normalized = []
+    seen_brands = set()
+
+    # --------------------------------------
+    # 🔍 PART DETECTION (INLINE - LIGHTWEIGHT)
+    # --------------------------------------
+    p = prompt.lower()
+
+    PART_KEYWORDS = {
+        "seat": ["seat", "seat cover"],
+        "headlight": ["headlight", "head lamp"],
+        "tail light": ["tail light", "rear light"],
+        "steering": ["steering"],
+        "tyre": ["tyre", "tire", "wheel"],
+        "brake": ["brake", "disc brake"],
+        "suspension": ["suspension", "shock absorber"],
+        "battery": ["battery", "ev battery"],
+        "mirror": ["mirror"],
+    }
+
+    detected_part = "automotive component"
+    for part, keywords in PART_KEYWORDS.items():
+        if any(k in p for k in keywords):
+            detected_part = part
+            break
+
+    # --------------------------------------
+    # 🧠 PART-BASED MATERIAL INTELLIGENCE
+    # --------------------------------------
+    PART_MATERIAL_MAP = {
+        "seat": "PU Leather / Fabric / Foam Composite",
+        "headlight": "Polycarbonate Lens + LED Matrix",
+        "tail light": "LED + Acrylic Housing",
+        "steering": "Leather Wrapped + Aluminum Core",
+        "tyre": "Rubber Compound + Steel Belt",
+        "brake": "Carbon Ceramic / Steel Disc",
+        "suspension": "Hydraulic + Alloy Steel",
+        "battery": "Lithium-ion Cells",
+        "mirror": "ABS Housing + Reflective Glass",
+    }
+
+    # --------------------------------------
+    # 🔄 NORMALIZATION LOOP
+    # --------------------------------------
     for item in specs:
         if not isinstance(item, dict):
             continue
-        normalized.append({
-            "Brand": item.get("Brand") or item.get("vendor") or "Unknown",
-            "Vehicle": item.get("Vehicle") or (item.get("compatibility")[0] if item.get("compatibility") else "Generic"),
-            "Type": item.get("Type") or item.get("model") or "Standard",
-            "Material": item.get("Material") or ("Synthetic Leather" if "leather" in str(item).lower() else "Advanced"),
-            "Strength": item.get("Strength") or "Optimized",
-            "Description": item.get("description") or "",
-            "Website": item.get("Website") if item.get("Website") and "http" in item.get("Website")
-                       else fetch_real_website(item.get("Brand", "automotive company"))
-        })
-    return normalized
 
+        brand = item.get("Brand") or item.get("vendor") or "Unknown"
+
+        # 🚫 Skip duplicates
+        if brand.lower() in seen_brands:
+            continue
+        seen_brands.add(brand.lower())
+
+        # ✅ Safe vehicle extraction
+        compatibility = item.get("compatibility")
+        if isinstance(compatibility, list) and len(compatibility) > 0:
+            vehicle = compatibility[0]
+        elif isinstance(compatibility, str):
+            vehicle = compatibility
+        else:
+            vehicle = item.get("Vehicle") or "Generic"
+
+        # ✅ Smart material logic (part-aware + fallback detection)
+        item_str = str(item).lower()
+
+        if item.get("Material"):
+            material = item.get("Material")
+        elif any(x in item_str for x in ["leather", "napa", "alcantara", "pu leather", "vegan leather"]):
+            material = "Premium Leather / Synthetic"
+        else:
+            material = PART_MATERIAL_MAP.get(detected_part, "Advanced Automotive Material")
+
+        # ✅ Dynamic type (based on part)
+        comp_type = item.get("Type") or item.get("model") or detected_part
+
+        # ✅ Strength tuning per part
+        if detected_part in ["brake", "suspension"]:
+            strength = item.get("Strength") or "High Load / Safety Critical"
+        elif detected_part in ["tyre"]:
+            strength = item.get("Strength") or "Wear Resistant / High Grip"
+        else:
+            strength = item.get("Strength") or "Optimized"
+
+        # ✅ Website logic (robust)
+        website = item.get("Website")
+        if not website or "http" not in website:
+            safe_brand = brand if brand and brand != "Unknown" else f"{detected_part} supplier india"
+            website = fetch_real_website(safe_brand)
+
+        normalized.append({
+            "Brand": brand,
+            "Vehicle": vehicle,
+            "Type": comp_type,
+            "Material": material,
+            "Strength": strength,
+            "Description": item.get("description") or "",
+            "Website": website
+        })
+
+    return normalized
 # --------------------------------------
 # IMAGE ENGINE (HF)
 # --------------------------------------
