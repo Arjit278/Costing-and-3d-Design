@@ -176,7 +176,8 @@ def normalize_specs(specs):
             "Material": item.get("Material") or ("Synthetic Leather" if "leather" in str(item).lower() else "Advanced"),
             "Strength": item.get("Strength") or "Optimized",
             "Description": item.get("description") or "",
-            "Website": item.get("Website") or ""
+            "Website": item.get("Website") if item.get("Website") and "http" in item.get("Website")
+                       else fetch_real_website(item.get("Brand", "automotive company"))
         })
     return normalized
 
@@ -202,7 +203,33 @@ def thread_rca(res, prompt):
 
 def thread_meta(res, prompt):
     res.specs_raw, _ = call_openrouter_with_fallback_requests(
-        f"Generate 3 automotive vendors JSON: {prompt}", OPENROUTER_API_KEY
+        f"""
+        Generate EXACTLY 3 REAL automotive seating/component vendors relevant to INDIA market (2024–2026).
+    
+        STRICT RULES:
+        - Must be REAL companies (India or global with India presence)
+        - NO fake names
+        - NO repetition
+        - Each must be DIFFERENT segment (e.g. OEM, premium, aftermarket)
+        - Include VERIFIED or likely official website
+        - Data must feel realistic for Indian automotive ecosystem
+    
+        OUTPUT FORMAT (JSON ARRAY ONLY):
+        [
+            {{
+                "Brand": "",
+                "Vehicle": "",
+                "Type": "",
+                "Material": "",
+                "Strength": "",
+                "Description": "",
+                "Website": ""
+            }}
+        ]
+    
+        CONTEXT: {prompt}
+        """,
+        OPENROUTER_API_KEY
     )
 
 def thread_assets(res, prompt):
@@ -247,15 +274,22 @@ if col1.button("🚀 EXECUTE"):
                 final_images.append(url)
 
     while len(final_images) < 3:
-        ai_img = hf_gen_image(f"{prompt}, automotive seat design")
+        dynamic_prompt = f"""
+        {prompt}, {random.choice(TREND_KEYWORDS)},
+        ultra modern automotive seat, india market, 2026 design,
+        premium materials, realistic lighting, 8k
+        """
+        ai_img = hf_gen_image(dynamic_prompt)
+    
         if ai_img:
             final_images.append(ai_img)
         else:
             break
-
+    # 3️⃣ FALLBACK (STILL DYNAMIC — NOT FIXED)
     while len(final_images) < 3:
-        final_images.append(f"https://source.unsplash.com/600x400/?car-seat,{len(final_images)}")
-
+        fallback_query = f"https://source.unsplash.com/600x400/?{prompt},{random.choice(TREND_KEYWORDS)}"
+        final_images.append(fallback_query)
+    
     res.final_images = final_images
 
     # --------------------------------------
