@@ -10,6 +10,16 @@ import zipfile  # NEW: For ZIP functionality
 from PIL import Image
 
 # --------------------------------------
+# 🔧 PAGE CONFIG
+# --------------------------------------
+st.set_page_config(page_title="Pictator Pro", page_icon="🏎️", layout="wide")
+
+st.title("🏎️ Pictator Pro – CEO Engineering Suite")
+st.caption("Strategic Parallel RCA | Multithreaded Design | 2026 Material Intel")
+
+
+
+# --------------------------------------
 # 🔐 LOGIN SYSTEM (ADDED - NO REMOVAL)
 # --------------------------------------
 if "authenticated" not in st.session_state:
@@ -45,24 +55,20 @@ if not st.session_state.authenticated:
 if "admin_logs" not in st.session_state:
     st.session_state.admin_logs = []
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("🛠 Admin Panel")
-st.sidebar.metric("🌍 Total Images (All Users)", st.session_state.global_count)
-
 if st.sidebar.checkbox("View Raw LLM Logs"):
     for log in reversed(st.session_state.admin_logs[-10:]):
         st.sidebar.text(f"{log['timestamp']} | {log['prompt']}")
         st.sidebar.code(log["raw_output"])
 
+# --- UPDATE THIS BLOCK ---
 if "global_count" not in st.session_state:
     st.session_state.global_count = 0
-# --------------------------------------
-# 🔧 PAGE CONFIG
-# --------------------------------------
-st.set_page_config(page_title="Pictator Pro", page_icon="🏎️", layout="wide")
 
-st.title("🏎️ Pictator Pro – CEO Engineering Suite")
-st.caption("Strategic Parallel RCA | Multithreaded Design | 2026 Material Intel")
+# Now the sidebar metric can safely find the key
+st.sidebar.markdown("---")
+st.sidebar.subheader("🛠 Admin Panel")
+st.sidebar.metric("🌍 Total Images (All Users)", st.session_state.global_count)
+
 
 # --------------------------------------
 # SESSION
