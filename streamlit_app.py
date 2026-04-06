@@ -90,26 +90,58 @@ HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 # --------------------------------------
 # 🌐 WEBSITE FETCH
 # --------------------------------------
-def fetch_real_website(brand):
+def fetch_real_website(brand, part="automotive"):
     try:
+        # 🎯 Build smart query based on part
+        if part == "seat":
+            query = f"{brand} car seat covers india buy OR site OR collection OR custom seat covers"
+        else:
+            query = f"{brand} automotive official website OR products"
+
         r = requests.get(
             "https://serpapi.com/search",
             params={
                 "engine": "google",
-                "q": f"{brand} official website",
+                "q": query,
                 "api_key": SERP_API_KEY
             },
             timeout=5
         )
+
         results = r.json().get("organic_results", [])
+
+        # --------------------------------------
+        # 🧠 PRIORITY FILTERING
+        # --------------------------------------
+        for res in results:
+            link = res.get("link", "").lower()
+
+            # ✅ Prefer product / collection pages
+            if any(k in link for k in [
+                "seat-cover", "seat-cover", "car-seat-cover",
+                "collection", "custom-seat", "products"
+            ]):
+                return res.get("link")
+
+        # --------------------------------------
+        # 🥈 SECOND PRIORITY: Official site
+        # --------------------------------------
+        for res in results:
+            link = res.get("link", "").lower()
+
+            if brand.lower().replace(" ", "") in link:
+                return res.get("link")
+
+        # --------------------------------------
+        # 🥉 FALLBACK: Any valid result
+        # --------------------------------------
         if results:
             return results[0].get("link")
+
     except:
         pass
 
-    clean = brand.lower().replace(" ", "").replace("-", "")
     return None
-
 # --------------------------------------
 # RESULT CONTAINER
 # --------------------------------------
@@ -299,7 +331,7 @@ def normalize_specs(specs, prompt=""):
         website = item.get("Website")
         if not website or "http" not in website:
             safe_brand = brand if brand and brand != "Unknown" else f"{detected_part} supplier india"
-            website = fetch_real_website(safe_brand)
+            website = fetch_real_website(safe_brand, detected_part)
         
         normalized.append({
             "Brand": brand,
