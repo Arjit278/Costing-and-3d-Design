@@ -236,9 +236,6 @@ def normalize_specs(specs, prompt=""):
     # ✅ Detect part from earlier logic
     allowed_brands = PART_BRAND_WHITELIST.get(detected_part, [])
     
-    # 🚫 Remove wrong-domain brands (KEY FIX)
-    if allowed_brands and not any(b.lower() in brand.lower() for b in allowed_brands):
-        continue
     # --------------------------------------
     # 🧠 PART-BASED MATERIAL INTELLIGENCE
     # --------------------------------------
