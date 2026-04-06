@@ -196,7 +196,7 @@ def safe_json_extract(text):
 # --------------------------------------
 PART_BRAND_WHITELIST = {
     "seat": [
-        "Stanley", "Autoform", "autofurnish", "reviews.oneclearwinner.com/product/car-seat-covers/", "Elegant Auto Accessories",
+        "Stanley", "Autoform", "autofurnish", "Elegant Auto Accessories",
         "KVD Auto", "Galaxy Auto", "Classic Auto"
     ],
     "tyre": ["MRF", "JK Tyre", "Apollo", "CEAT", "Bridgestone"],
