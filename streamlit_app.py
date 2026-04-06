@@ -434,7 +434,7 @@ if col1.button("🚀 EXECUTE"):
     st.session_state.global_count += generated_count
     
     if not res.final_images:
-    st.warning("No images generated")
+        st.warning("No images generated")
     # --------------------------------------
     # 📦 DOWNLOAD ALL LOGIC (ZIP)
     # --------------------------------------
