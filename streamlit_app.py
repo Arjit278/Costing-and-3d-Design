@@ -547,9 +547,7 @@ if col1.button("🚀 EXECUTE"):
     
     return normalized[:3]
 
-    # ✅ Always return at end of function
-    return normalized[:3]
-    
+     
     # --- PATCH: DOWNLOAD TEXT REPORT ---
     report_text = f"ANALYSIS: {prompt}\n\nTRENDS:\n{res.rca_intel}\n\nSPECS:\n{json.dumps(specs, indent=2)}"
     st.sidebar.download_button("📄 Download Full Report", report_text, f"report_{prompt[:10]}.txt", "text/plain")
