@@ -196,7 +196,7 @@ def safe_json_extract(text):
 # --------------------------------------
 PART_BRAND_WHITELIST = {
     "seat": [
-        "Stanley", "Autoform", "autofurnish.com/", "Elegant Auto Accessories",
+        "Stanley", "Autoform", "autofurnish.com/", reviews.oneclearwinner.com/product/car-seat-covers/, "Elegant Auto Accessories",
         "KVD Auto", "Galaxy Auto", "Classic Auto"
     ],
     "tyre": ["MRF", "JK Tyre", "Apollo", "CEAT", "Bridgestone"],
@@ -240,7 +240,7 @@ def normalize_specs(specs, prompt=""):
     # 🧠 PART-BASED MATERIAL INTELLIGENCE
     # --------------------------------------
     PART_MATERIAL_MAP = {
-        "seat": "PU Leather / Fabric / Foam Composite",
+        "seat": "PU Leather / Fabric / Nappa leather",
         "headlight": "Polycarbonate Lens + LED Matrix",
         "tail light": "LED + Acrylic Housing",
         "steering": "Leather Wrapped + Aluminum Core",
@@ -411,6 +411,7 @@ def thread_meta(res, prompt):
         - If part = seat cover → ONLY seat cover manufacturers
         - DO NOT return tyre, battery, or unrelated brands
         - Prefer Indian aftermarket interior brands
+        - Also show trends in world in german, italy and spain
     
         FORMAT:
         [
