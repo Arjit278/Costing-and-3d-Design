@@ -482,10 +482,13 @@ if col1.button("🚀 EXECUTE"):
 # --------------------------------------
 # 🛡 FINAL FALLBACK (CLEAN + SINGLE POINT)
 # --------------------------------------
+        # --------------------------------------
+    # 🛡 FINAL FALLBACK (CLEAN + SINGLE POINT)
+    # --------------------------------------
     if not normalized or all(d.get("Brand") == "Unknown" for d in normalized):
-    
+
         if detected_part == "seat":
-            return [
+            normalized = [
                 {
                     "Brand": "Autoform",
                     "Vehicle": "Passenger Car",
@@ -514,37 +517,40 @@ if col1.button("🚀 EXECUTE"):
                     "Website": "https://elegantauto.in"
                 }
             ]
+        else:
+            normalized = [
+                {
+                    "Brand": "Bosch India",
+                    "Vehicle": "Passenger Car",
+                    "Type": "Automotive Component",
+                    "Material": "Advanced Automotive Material",
+                    "Strength": "High Reliability",
+                    "Description": "Leading OEM supplier in India",
+                    "Website": "https://www.bosch.in"
+                },
+                {
+                    "Brand": "Uno Minda",
+                    "Vehicle": "2W/4W",
+                    "Type": "Automotive Component",
+                    "Material": "Engineered Materials",
+                    "Strength": "Durable",
+                    "Description": "Major Indian auto component manufacturer",
+                    "Website": "https://www.unominda.com"
+                },
+                {
+                    "Brand": "Lumax",
+                    "Vehicle": "Passenger Car",
+                    "Type": "Lighting & Components",
+                    "Material": "Polycarbonate / Electronics",
+                    "Strength": "OEM Grade",
+                    "Description": "Leading automotive lighting player",
+                    "Website": "https://www.lumaxworld.in"
+                }
+            ]
+
+    # ✅ Always return at end of function
+    return normalized[:3]
     
-        # 🔁 Generic fallback (for all other parts)
-        return [
-            {
-                "Brand": "Bosch India",
-                "Vehicle": "Passenger Car",
-                "Type": "Automotive Component",
-                "Material": "Advanced Automotive Material",
-                "Strength": "High Reliability",
-                "Description": "Leading OEM supplier in India",
-                "Website": "https://www.bosch.in"
-            },
-            {
-                "Brand": "Uno Minda",
-                "Vehicle": "2W/4W",
-                "Type": "Automotive Component",
-                "Material": "Engineered Materials",
-                "Strength": "Durable",
-                "Description": "Major Indian auto component manufacturer",
-                "Website": "https://www.unominda.com"
-            },
-            {
-                "Brand": "Lumax",
-                "Vehicle": "Passenger Car",
-                "Type": "Lighting & Components",
-                "Material": "Polycarbonate / Electronics",
-                "Strength": "OEM Grade",
-                "Description": "Leading automotive lighting player",
-                "Website": "https://www.lumaxworld.in"
-            }
-        ]
     # --- PATCH: DOWNLOAD TEXT REPORT ---
     report_text = f"ANALYSIS: {prompt}\n\nTRENDS:\n{res.rca_intel}\n\nSPECS:\n{json.dumps(specs, indent=2)}"
     st.sidebar.download_button("📄 Download Full Report", report_text, f"report_{prompt[:10]}.txt", "text/plain")
