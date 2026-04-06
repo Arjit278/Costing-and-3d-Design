@@ -444,8 +444,8 @@ def thread_meta(res, prompt):
         - DO NOT return tyre, battery, or unrelated brands
         - Prefer Indian aftermarket interior brands with weblinks
         - Include latest trends 2026 like Ultra-Quilt (Diamond), Carbon Fiber Texture, Minimalist "Flat" Grain, "GSM" (Grams per Square Meter) of the material
-        - Display direct links like https://www.autofurnish.com/collections/oem-style-factory-fitted-seat-covers, autofurnish.com/collections/oem-style-factory-fitted-seat-covers
-        - Also show trends in world in europe with weblinks
+        - Display direct Website like https://www.autofurnish.com/collections/oem-style-factory-fitted-seat-covers, autofurnish.com/collections/oem-style-factory-fitted-seat-covers
+        - Also show trends in world in europe with websites working properly
     
         FORMAT:
         [
