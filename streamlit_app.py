@@ -479,14 +479,11 @@ if col1.button("🚀 EXECUTE"):
     })
     specs = normalize_specs(raw_specs, prompt)
 
-# --------------------------------------
-# 🛡 FINAL FALLBACK (CLEAN + SINGLE POINT)
-# --------------------------------------
-        # --------------------------------------
-    # 🛡 FINAL FALLBACK (CLEAN + SINGLE POINT)
+    # --------------------------------------
+    # 🛡 FINAL FALLBACK (INSIDE FUNCTION)
     # --------------------------------------
     if not normalized or all(d.get("Brand") == "Unknown" for d in normalized):
-
+    
         if detected_part == "seat":
             normalized = [
                 {
@@ -547,6 +544,8 @@ if col1.button("🚀 EXECUTE"):
                     "Website": "https://www.lumaxworld.in"
                 }
             ]
+    
+    return normalized[:3]
 
     # ✅ Always return at end of function
     return normalized[:3]
