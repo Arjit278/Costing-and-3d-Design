@@ -410,8 +410,8 @@ def thread_meta(res, prompt):
         STRICT RULES:
         - If part = seat cover → ONLY seat cover manufacturers
         - DO NOT return tyre, battery, or unrelated brands
-        - Prefer Indian aftermarket interior brands
-        - Also show trends in world in german, italy and spain
+        - Prefer Indian aftermarket interior brands with weblinks
+        - Also show trends in world in europe with weblinks
     
         FORMAT:
         [
