@@ -420,10 +420,14 @@ if col1.button("🚀 EXECUTE"):
         report = f"TOPIC: {prompt}\n\nTRENDS:\n{res.rca_intel}\n\nSPECS:\n{res.specs_raw}"
         zf.writestr("full_report.txt", report)
         # Images
+        # --- UPDATE THIS SUB-BLOCK ---
         if res.ai_concept:
-            img_byte = io.BytesIO()
-            res.ai_concept.save(img_byte, format="PNG")
-            zf.writestr("concept_design.png", img_byte.getvalue())
+            try:
+                img_byte = io.BytesIO()
+                res.ai_concept.save(img_byte, format="PNG")
+                zf.writestr("concept_design.png", img_byte.getvalue())
+            except Exception as e:
+                st.error(f"Error saving ZIP image: {e}")
         for idx, img_obj in enumerate(res.final_images):
             if isinstance(img_obj, Image.Image):
                 img_byte = io.BytesIO()
