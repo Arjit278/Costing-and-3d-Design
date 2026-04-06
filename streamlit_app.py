@@ -108,7 +108,7 @@ def fetch_real_website(brand):
         pass
 
     clean = brand.lower().replace(" ", "").replace("-", "")
-    return f"https://www.{clean}.com"
+    return None
 
 # --------------------------------------
 # RESULT CONTAINER
@@ -192,6 +192,19 @@ def safe_json_extract(text):
     return []
 
 # --------------------------------------
+# ✅ DOMAIN BRAND FILTER
+# --------------------------------------
+PART_BRAND_WHITELIST = {
+    "seat": [
+        "Stanley", "Autoform", "autofurnish.com/", "Elegant Auto Accessories",
+        "KVD Auto", "Galaxy Auto", "Classic Auto"
+    ],
+    "tyre": ["MRF", "JK Tyre", "Apollo", "CEAT", "Bridgestone"],
+    "battery": ["Amaron", "Exide"],
+    "lighting": ["Lumax", "Philips Automotive"],
+}
+
+# --------------------------------------
 # NORMALIZER
 # --------------------------------------
 def normalize_specs(specs, prompt=""):
@@ -220,7 +233,12 @@ def normalize_specs(specs, prompt=""):
         if any(k in p for k in keywords):
             detected_part = part
             break
-
+    # ✅ Detect part from earlier logic
+    allowed_brands = PART_BRAND_WHITELIST.get(detected_part, [])
+    
+    # 🚫 Remove wrong-domain brands (KEY FIX)
+    if allowed_brands and not any(b.lower() in brand.lower() for b in allowed_brands):
+        continue
     # --------------------------------------
     # 🧠 PART-BASED MATERIAL INTELLIGENCE
     # --------------------------------------
@@ -285,8 +303,8 @@ def normalize_specs(specs, prompt=""):
         if not website or "http" not in website:
             safe_brand = brand if brand and brand != "Unknown" else f"{detected_part} supplier india"
             website = fetch_real_website(safe_brand)
-
-        normalized.append({
+        
+                normalized.append({
             "Brand": brand,
             "Vehicle": vehicle,
             "Type": comp_type,
@@ -323,8 +341,11 @@ def thread_meta(res, prompt):
         Return ONLY VALID JSON. No explanation. No text.
     
         Generate EXACTLY 3 REAL automotive vendors for: {prompt}
-    
-        India market focus.
+        
+        STRICT RULES:
+        - If part = seat cover → ONLY seat cover manufacturers
+        - DO NOT return tyre, battery, or unrelated brands
+        - Prefer Indian aftermarket interior brands
     
         FORMAT:
         [
@@ -411,6 +432,9 @@ if col1.button("🚀 EXECUTE"):
     
     st.session_state.count += generated_count
     st.session_state.global_count += generated_count
+    
+    if not res.final_images:
+    st.warning("No images generated")
     # --------------------------------------
     # 📦 DOWNLOAD ALL LOGIC (ZIP)
     # --------------------------------------
@@ -457,6 +481,38 @@ if col1.button("🚀 EXECUTE"):
         "raw_output": res.specs_raw
     })
     specs = normalize_specs(raw_specs, prompt)
+
+    if not normalized:
+    if detected_part == "seat":
+        normalized = [
+            {
+                "Brand": "Autoform",
+                "Vehicle": "Passenger Car",
+                "Type": "Seat Cover",
+                "Material": "PU Leather",
+                "Strength": "Premium Finish",
+                "Description": "India leader in custom seat covers",
+                "Website": "https://autoform.in"
+            },
+            {
+                "Brand": "Stanley",
+                "Vehicle": "Premium Cars",
+                "Type": "Seat Cover",
+                "Material": "Nappa Leather",
+                "Strength": "Luxury Grade",
+                "Description": "High-end automotive interiors",
+                "Website": "https://stanleyboutique.com"
+            },
+            {
+                "Brand": "Elegant Auto Accessories",
+                "Vehicle": "Universal Fit",
+                "Type": "Seat Cover",
+                "Material": "Synthetic Leather",
+                "Strength": "Durable",
+                "Description": "Mass market seat cover supplier",
+                "Website": "https://elegantauto.in"
+            }
+        ]
     
     if not specs or all(d.get("Brand") == "Unknown" for d in specs):
         specs = [
