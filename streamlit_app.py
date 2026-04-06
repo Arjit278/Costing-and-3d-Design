@@ -482,40 +482,44 @@ if col1.button("🚀 EXECUTE"):
     })
     specs = normalize_specs(raw_specs, prompt)
 
-    if not normalized:
-    if detected_part == "seat":
-        normalized = [
-            {
-                "Brand": "Autoform",
-                "Vehicle": "Passenger Car",
-                "Type": "Seat Cover",
-                "Material": "PU Leather",
-                "Strength": "Premium Finish",
-                "Description": "India leader in custom seat covers",
-                "Website": "https://autoform.in"
-            },
-            {
-                "Brand": "Stanley",
-                "Vehicle": "Premium Cars",
-                "Type": "Seat Cover",
-                "Material": "Nappa Leather",
-                "Strength": "Luxury Grade",
-                "Description": "High-end automotive interiors",
-                "Website": "https://stanleyboutique.com"
-            },
-            {
-                "Brand": "Elegant Auto Accessories",
-                "Vehicle": "Universal Fit",
-                "Type": "Seat Cover",
-                "Material": "Synthetic Leather",
-                "Strength": "Durable",
-                "Description": "Mass market seat cover supplier",
-                "Website": "https://elegantauto.in"
-            }
-        ]
+# --------------------------------------
+# 🛡 FINAL FALLBACK (CLEAN + SINGLE POINT)
+# --------------------------------------
+    if not normalized or all(d.get("Brand") == "Unknown" for d in normalized):
     
-    if not specs or all(d.get("Brand") == "Unknown" for d in specs):
-        specs = [
+        if detected_part == "seat":
+            return [
+                {
+                    "Brand": "Autoform",
+                    "Vehicle": "Passenger Car",
+                    "Type": "Seat Cover",
+                    "Material": "PU Leather",
+                    "Strength": "Premium Finish",
+                    "Description": "India leader in custom seat covers",
+                    "Website": "https://autoform.in"
+                },
+                {
+                    "Brand": "Stanley",
+                    "Vehicle": "Premium Cars",
+                    "Type": "Seat Cover",
+                    "Material": "Nappa Leather",
+                    "Strength": "Luxury Grade",
+                    "Description": "High-end automotive interiors",
+                    "Website": "https://stanleyboutique.com"
+                },
+                {
+                    "Brand": "Elegant Auto Accessories",
+                    "Vehicle": "Universal Fit",
+                    "Type": "Seat Cover",
+                    "Material": "Synthetic Leather",
+                    "Strength": "Durable",
+                    "Description": "Mass market seat cover supplier",
+                    "Website": "https://elegantauto.in"
+                }
+            ]
+    
+        # 🔁 Generic fallback (for all other parts)
+        return [
             {
                 "Brand": "Bosch India",
                 "Vehicle": "Passenger Car",
@@ -544,7 +548,6 @@ if col1.button("🚀 EXECUTE"):
                 "Website": "https://www.lumaxworld.in"
             }
         ]
-
     # --- PATCH: DOWNLOAD TEXT REPORT ---
     report_text = f"ANALYSIS: {prompt}\n\nTRENDS:\n{res.rca_intel}\n\nSPECS:\n{json.dumps(specs, indent=2)}"
     st.sidebar.download_button("📄 Download Full Report", report_text, f"report_{prompt[:10]}.txt", "text/plain")
