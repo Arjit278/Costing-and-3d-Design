@@ -304,7 +304,7 @@ def normalize_specs(specs, prompt=""):
             safe_brand = brand if brand and brand != "Unknown" else f"{detected_part} supplier india"
             website = fetch_real_website(safe_brand)
         
-                normalized.append({
+        normalized.append({
             "Brand": brand,
             "Vehicle": vehicle,
             "Type": comp_type,
