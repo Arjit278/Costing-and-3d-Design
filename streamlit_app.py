@@ -312,6 +312,74 @@ def normalize_specs(specs, prompt=""):
         })
 
     return normalized
+
+    # --------------------------------------
+    # 🛡 FINAL FALLBACK (INSIDE FUNCTION)
+    # --------------------------------------
+    if not normalized or all(d.get("Brand") == "Unknown" for d in normalized):
+    
+        if detected_part == "seat":
+            normalized = [
+                {
+                    "Brand": "Autoform",
+                    "Vehicle": "Passenger Car",
+                    "Type": "Seat Cover",
+                    "Material": "PU Leather",
+                    "Strength": "Premium Finish",
+                    "Description": "India leader in custom seat covers",
+                    "Website": "https://autoform.in"
+                },
+                {
+                    "Brand": "Stanley",
+                    "Vehicle": "Premium Cars",
+                    "Type": "Seat Cover",
+                    "Material": "Nappa Leather",
+                    "Strength": "Luxury Grade",
+                    "Description": "High-end automotive interiors",
+                    "Website": "https://stanleyboutique.com"
+                },
+                {
+                    "Brand": "Elegant Auto Accessories",
+                    "Vehicle": "Universal Fit",
+                    "Type": "Seat Cover",
+                    "Material": "Synthetic Leather",
+                    "Strength": "Durable",
+                    "Description": "Mass market seat cover supplier",
+                    "Website": "https://elegantauto.in"
+                }
+            ]
+        else:
+            normalized = [
+                {
+                    "Brand": "Bosch India",
+                    "Vehicle": "Passenger Car",
+                    "Type": "Automotive Component",
+                    "Material": "Advanced Automotive Material",
+                    "Strength": "High Reliability",
+                    "Description": "Leading OEM supplier in India",
+                    "Website": "https://www.bosch.in"
+                },
+                {
+                    "Brand": "Uno Minda",
+                    "Vehicle": "2W/4W",
+                    "Type": "Automotive Component",
+                    "Material": "Engineered Materials",
+                    "Strength": "Durable",
+                    "Description": "Major Indian auto component manufacturer",
+                    "Website": "https://www.unominda.com"
+                },
+                {
+                    "Brand": "Lumax",
+                    "Vehicle": "Passenger Car",
+                    "Type": "Lighting & Components",
+                    "Material": "Polycarbonate / Electronics",
+                    "Strength": "OEM Grade",
+                    "Description": "Leading automotive lighting player",
+                    "Website": "https://www.lumaxworld.in"
+                }
+            ]
+    
+    return normalized[:3]
 # --------------------------------------
 # IMAGE ENGINE (HF)
 # --------------------------------------
@@ -479,75 +547,7 @@ if col1.button("🚀 EXECUTE"):
     })
     specs = normalize_specs(raw_specs, prompt)
 
-    # --------------------------------------
-    # 🛡 FINAL FALLBACK (INSIDE FUNCTION)
-    # --------------------------------------
-    if not normalized or all(d.get("Brand") == "Unknown" for d in normalized):
-    
-        if detected_part == "seat":
-            normalized = [
-                {
-                    "Brand": "Autoform",
-                    "Vehicle": "Passenger Car",
-                    "Type": "Seat Cover",
-                    "Material": "PU Leather",
-                    "Strength": "Premium Finish",
-                    "Description": "India leader in custom seat covers",
-                    "Website": "https://autoform.in"
-                },
-                {
-                    "Brand": "Stanley",
-                    "Vehicle": "Premium Cars",
-                    "Type": "Seat Cover",
-                    "Material": "Nappa Leather",
-                    "Strength": "Luxury Grade",
-                    "Description": "High-end automotive interiors",
-                    "Website": "https://stanleyboutique.com"
-                },
-                {
-                    "Brand": "Elegant Auto Accessories",
-                    "Vehicle": "Universal Fit",
-                    "Type": "Seat Cover",
-                    "Material": "Synthetic Leather",
-                    "Strength": "Durable",
-                    "Description": "Mass market seat cover supplier",
-                    "Website": "https://elegantauto.in"
-                }
-            ]
-        else:
-            normalized = [
-                {
-                    "Brand": "Bosch India",
-                    "Vehicle": "Passenger Car",
-                    "Type": "Automotive Component",
-                    "Material": "Advanced Automotive Material",
-                    "Strength": "High Reliability",
-                    "Description": "Leading OEM supplier in India",
-                    "Website": "https://www.bosch.in"
-                },
-                {
-                    "Brand": "Uno Minda",
-                    "Vehicle": "2W/4W",
-                    "Type": "Automotive Component",
-                    "Material": "Engineered Materials",
-                    "Strength": "Durable",
-                    "Description": "Major Indian auto component manufacturer",
-                    "Website": "https://www.unominda.com"
-                },
-                {
-                    "Brand": "Lumax",
-                    "Vehicle": "Passenger Car",
-                    "Type": "Lighting & Components",
-                    "Material": "Polycarbonate / Electronics",
-                    "Strength": "OEM Grade",
-                    "Description": "Leading automotive lighting player",
-                    "Website": "https://www.lumaxworld.in"
-                }
-            ]
-    
-    return normalized[:3]
-
-     
+         
     # --- PATCH: DOWNLOAD TEXT REPORT ---
     report_text = f"ANALYSIS: {prompt}\n\nTRENDS:\n{res.rca_intel}\n\nSPECS:\n{json.dumps(specs, indent=2)}"
     st.sidebar.download_button("📄 Download Full Report", report_text, f"report_{prompt[:10]}.txt", "text/plain")
