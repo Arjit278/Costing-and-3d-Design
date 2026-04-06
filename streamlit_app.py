@@ -336,7 +336,7 @@ def normalize_specs(specs, prompt=""):
                     "Material": "Nappa Leather",
                     "Strength": "Luxury Grade",
                     "Description": "High-end automotive interiors",
-                    "Website": "https://stanleyboutique.com"
+                    "Website": reviews.oneclearwinner.com/product/custom-made-car-seat-covers
                 },
                 {
                     "Brand": "Elegant Auto Accessories",
@@ -345,7 +345,7 @@ def normalize_specs(specs, prompt=""):
                     "Material": "Synthetic Leather",
                     "Strength": "Durable",
                     "Description": "Mass market seat cover supplier",
-                    "Website": "https://elegantauto.in"
+                    "Website": "https://www.autofurnish.com/collections/oem-style-factory-fitted-seat-covers"
                 }
             ]
         else:
