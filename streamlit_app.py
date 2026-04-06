@@ -411,6 +411,7 @@ def thread_meta(res, prompt):
         - If part = seat cover → ONLY seat cover manufacturers
         - DO NOT return tyre, battery, or unrelated brands
         - Prefer Indian aftermarket interior brands with weblinks
+        - Include latest trends 2026 like Ultra-Quilt (Diamond), Carbon Fiber Texture, Minimalist "Flat" Grain, "GSM" (Grams per Square Meter) of the material
         - Display direct links like https://www.autofurnish.com/collections/oem-style-factory-fitted-seat-covers, autofurnish.com/collections/oem-style-factory-fitted-seat-covers
         - Also show trends in world in europe with weblinks
     
