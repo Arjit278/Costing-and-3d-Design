@@ -81,6 +81,28 @@ st.sidebar.metric("🧑 Your Generated Images", st.session_state.count)
 st.sidebar.markdown("---")
 
 # --------------------------------------
+# 🎨 MODEL SELECTOR (NEW PATCH)
+# --------------------------------------
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎨 Image Model Control")
+
+MODEL_OPTIONS = {
+    "⚡ Default (Fast - FLUX Schnell)": "black-forest-labs/FLUX.1-schnell",
+    "🔥 Krea Dev (Ultra Realistic)": "black-forest-labs/FLUX.1-Krea-dev",
+    "🧠 Qwen Image (Balanced AI)": "Qwen/Qwen-Image",
+    "⚡ SDXL Lightning (Fastest)": "ByteDance/SDXL-Lightning"
+}
+
+selected_model_label = st.sidebar.selectbox(
+    "Choose Generation Model",
+    list(MODEL_OPTIONS.keys())
+)
+
+SELECTED_MODEL = MODEL_OPTIONS[selected_model_label]
+
+st.sidebar.caption(f"Active Model: {SELECTED_MODEL}")
+
+# --------------------------------------
 # API CONFIG
 # --------------------------------------
 OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
@@ -272,7 +294,7 @@ def normalize_specs(specs, prompt=""):
     # 🧠 PART-BASED MATERIAL INTELLIGENCE
     # --------------------------------------
     PART_MATERIAL_MAP = {
-        "seat": "PU Leather / Fabric / Nappa leather",
+        "seat": "PU Leather / Fabric / Nappa leather/ synthetic leather",
         "headlight": "Polycarbonate Lens + LED Matrix",
         "tail light": "LED + Acrylic Housing",
         "steering": "Leather Wrapped + Aluminum Core",
@@ -412,18 +434,119 @@ def normalize_specs(specs, prompt=""):
             ]
     
     return normalized[:3]
+
+# --------------------------------------
+# 🎯 TREND KEYWORDS (NEW FIX)
+# --------------------------------------
+TREND_KEYWORDS = [
+    "diamond quilted",
+    "carbon fiber texture",
+    "minimalist flat design",
+    "luxury napa leather",
+    "sport racing style",
+    "perforated leather",
+    "premium stitching",
+    "futuristic interior",
+    "ergonomic contour",
+    "high contrast dual tone",
+    "matte finish",
+    "3D embossed pattern"
+]
+
 # --------------------------------------
 # IMAGE ENGINE (HF)
 # --------------------------------------
+
 def hf_gen_image(prompt):
     try:
-        url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-        r = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=60)
-        return Image.open(io.BytesIO(r.content)).convert("RGB")
-    except:
+        model = SELECTED_MODEL
+        model_url = f"https://router.huggingface.co/hf-inference/models/{model}"
+
+        headers = {
+            "Authorization": f"Bearer {HF_TOKEN}",
+            "Content-Type": "application/json"
+        }
+
+        # --------------------------------------
+        # 🎯 MODEL-SPECIFIC PARAMS (IMPORTANT)
+        # --------------------------------------
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "guidance_scale": 7.5,
+                "num_inference_steps": 28,
+                "width": 1024,
+                "height": 1024
+            }
+        }
+
+        if "Lightning" in model:
+            payload["parameters"]["num_inference_steps"] = 8
+            payload["parameters"]["width"] = 768
+            payload["parameters"]["height"] = 768
+
+        if "Krea" in model:
+            payload["parameters"]["guidance_scale"] = 8.5
+            payload["parameters"]["num_inference_steps"] = 30
+
+        # --------------------------------------
+        # 🚀 MAIN REQUEST
+        # --------------------------------------
+        r = requests.post(model_url, headers=headers, json=payload, timeout=60)
+
+        # --------------------------------------
+        # ✅ VALID IMAGE CHECK (CRITICAL FIX)
+        # --------------------------------------
+        if r.status_code == 200 and "image" in r.headers.get("content-type", ""):
+            return Image.open(io.BytesIO(r.content)).convert("RGB")
+
+        else:
+            print("❌ MODEL FAILED:", model, r.status_code, r.text)
+
+            # --------------------------------------
+            # 🔥 FALLBACK TO STABLE MODEL
+            # --------------------------------------
+            fallback = "black-forest-labs/FLUX.1-schnell"
+            fallback_url = f"https://router.huggingface.co/hf-inference/models/{fallback}"
+
+            print("⚡ Switching to fallback:", fallback)
+
+            r2 = requests.post(
+                fallback_url,
+                headers=headers,
+                json={
+                    "inputs": prompt,
+                    "parameters": {
+                        "width": 1024,
+                        "height": 1024
+                    }
+                },
+                timeout=60
+            )
+
+            if r2.status_code == 200:
+                return Image.open(io.BytesIO(r2.content)).convert("RGB")
+
+            return None
+
+    except Exception as e:
+        print("🔥 HF ERROR:", e)
         return None
 
+def enhance_prompt(prompt):
+    base = f"{prompt}, automotive interior, ultra detailed, 8k, professional lighting"
+
+    if "Krea" in SELECTED_MODEL:
+        return base + ", cinematic, photorealistic, leather texture, luxury finish"
+
+    elif "Qwen" in SELECTED_MODEL:
+        return base + ", clean composition, structured design, product render"
+
+    elif "Lightning" in SELECTED_MODEL:
+        return base + ", sharp, high contrast, fast render"
+
+    return base
+    
 # --------------------------------------
 # THREADS
 # --------------------------------------
@@ -442,10 +565,11 @@ def thread_meta(res, prompt):
         STRICT RULES:
         - If part = seat cover → ONLY seat cover manufacturers
         - DO NOT return tyre, battery, or unrelated brands
+        - Share European and international market designs with weblinks 
         - Prefer Indian aftermarket interior brands with weblinks
         - Include latest trends 2026 like Ultra-Quilt (Diamond), Carbon Fiber Texture, Minimalist "Flat" Grain, "GSM" (Grams per Square Meter) of the material
         - Display direct Website like https://www.autofurnish.com/collections/oem-style-factory-fitted-seat-covers, autofurnish.com/collections/oem-style-factory-fitted-seat-covers
-        - Also show trends in world in europe with websites working properly
+        - Also show trends in world in europe with websites and links with URL working properly
     
         FORMAT:
         [
@@ -478,13 +602,50 @@ def thread_assets(res, prompt):
         res.market_photos = r.json().get("images_results", [])[:3]
     except:
         res.market_photos = []
-    res.ai_concept = hf_gen_image(prompt)
+    res.ai_concept = hf_gen_image(enhance_prompt(final_prompt))
 
 # --------------------------------------
 # UI
 # --------------------------------------
 prompt = st.text_area("Enter Topic")
 
+# --------------------------------------
+# 🎯 STRUCTURED PROMPT BUILDER (NEW)
+# --------------------------------------
+st.subheader("🧠 Smart Design Builder")
+
+colA, colB, colC = st.columns(3)
+
+with colA:
+    car_model = st.text_input("Car Model", "Wagon-R, Grand Vitara")
+    seat_shape = st.selectbox("Seat Shape", ["bucket", "flat", "hybrid"])
+
+with colB:
+    material = st.selectbox("Material", ["PU leather", "Nappa leather", "synthetic", "fabric"])
+    stitching = st.selectbox("Stitching", ["diamond", "hex", "straight"])
+
+with colC:
+    color = st.text_input("Color Combo", "black + tan")
+    use_case = st.selectbox("Use Case", ["luxury", "budget", "sporty"])
+
+lighting = st.selectbox("Lighting", ["studio", "ambient", "showroom", "blueprint"])
+quality = "8k photorealistic"
+
+# --------------------------------------
+# 🔥 FINAL PROMPT (AUTO GENERATED)
+# --------------------------------------
+structured_prompt = f"""
+Automotive seat cover design for {car_model},
+{seat_shape} seats, {material},
+{stitching} stitching pattern,
+{color} color combination,
+{use_case} design style,
+{lighting} lighting,
+ultra detailed textures, {quality}
+"""
+
+# 👉 Combine with user input (VERY IMPORTANT)
+final_prompt = f"{prompt}, {structured_prompt}"
 col1, col2 = st.columns(2)
 
 if col1.button("🚀 EXECUTE"):
@@ -494,47 +655,69 @@ if col1.button("🚀 EXECUTE"):
         t1 = threading.Thread(target=thread_rca, args=(res, prompt))
         t2 = threading.Thread(target=thread_meta, args=(res, prompt))
         t3 = threading.Thread(target=thread_assets, args=(res, prompt))
+        t4 = threading.Thread(target=thread_assets, args=(res, prompt))
 
         t1.start(); t2.start(); t3.start()
         t1.join(); t2.join(); t3.join()
         status.update(label="✅ Analysis Complete", state="complete")
 
     # --------------------------------------
-    # 🔥 FINAL IMAGE PIPELINE (FIXED)
+    # 🔥 FINAL IMAGE PIPELINE (UPGRADED)
     # --------------------------------------
     final_images = []
+    
+    # --------------------------------------
+    # 1️⃣ MARKET IMAGES (UNCHANGED)
+    # --------------------------------------
     if res.market_photos:
         for img_data in res.market_photos:
             url = img_data.get("thumbnail") or img_data.get("original")
             if url:
                 final_images.append(url)
-
+    
+    # --------------------------------------
+    # 2️⃣ AI GENERATED IMAGES (USING FINAL PROMPT ✅)
+    # --------------------------------------
     while len(final_images) < 3:
         dynamic_prompt = f"""
-        {prompt}, {random.choice(TREND_KEYWORDS)},
+        {final_prompt}, {random.choice(TREND_KEYWORDS)},
         ultra modern automotive seat, india market, 2026 design,
         premium materials, realistic lighting, 8k
         """
-        ai_img = hf_gen_image(dynamic_prompt)
+    
+        ai_img = hf_gen_image(enhance_prompt(dynamic_prompt))
     
         if ai_img:
             final_images.append(ai_img)
         else:
-            break
-    # 3️⃣ FALLBACK (STILL DYNAMIC — NOT FIXED)
+            # ❌ If model fails, DO NOT break → try again
+            continue
+    
+    # --------------------------------------
+    # 3️⃣ FALLBACK (SMARTER)
+    # --------------------------------------
     while len(final_images) < 3:
-        fallback_query = f"https://source.unsplash.com/600x400/?{prompt},{random.choice(TREND_KEYWORDS)}"
+        fallback_query = f"https://source.unsplash.com/600x400/?{final_prompt},{random.choice(TREND_KEYWORDS)}"
         final_images.append(fallback_query)
     
+    # --------------------------------------
+    # ✅ SAVE RESULTS
+    # --------------------------------------
     res.final_images = final_images
-    # ✅ Count generated images
-    generated_count = len(res.final_images)
     
+    # --------------------------------------
+    # 📊 COUNTING
+    # --------------------------------------
+    generated_count = len(res.final_images)
     st.session_state.count += generated_count
     st.session_state.global_count += generated_count
     
+    # --------------------------------------
+    # ⚠️ SAFETY CHECK
+    # --------------------------------------
     if not res.final_images:
         st.warning("No images generated")
+    
     # --------------------------------------
     # 📦 DOWNLOAD ALL LOGIC (ZIP)
     # --------------------------------------
@@ -621,7 +804,7 @@ if col1.button("🚀 EXECUTE"):
 # --------------------------------------
 if col2.button("🎨 RENDER"):
     with st.spinner("🎨 Fast Rendering 8K Intel..."):
-        img_render = hf_gen_image(f"{prompt}, ultra realistic, 8k, photorealistic automotive engineering")
+        img_render = hf_gen_image(enhance_prompt(f"{prompt}, ultra realistic, 8k, Seat Cover interior Desgins, photorealistic automotive engineering")) 
         if img_render:
             st.image(img_render)
             st.session_state.count += 1
