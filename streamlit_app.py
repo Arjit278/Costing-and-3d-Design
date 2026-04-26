@@ -117,6 +117,19 @@ def run_image_engine(prompt, base_image=None):
         st.sidebar.error(f"Engine Detail: {e}")
         return None
 
+def generate_image_via_openrouter(prompt):
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}"}
+    r = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers=headers,
+        json={
+            "model": "google/imagen-3", # Or another available image model
+            "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
+        }
+    )
+    # Note: OpenRouter usually returns a URL for the image
+    return r.json()['choices'][0]['message']['content']
+    
 def fetch_market_references(query):
     try:
         params = {"engine": "google_images", "q": f"{query} luxury car seat cover", "api_key": SERP_API_KEY, "num": 40}
