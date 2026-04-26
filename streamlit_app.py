@@ -83,20 +83,37 @@ with st.sidebar:
 # --------------------------------------
 # ⚙️ ENGINES
 # --------------------------------------
+ --------------------------------------
+# ⚡ FLASHMIND ENGINE (OPENROUTER)
+# --------------------------------------
+ANALYSIS_MODELS = [
+    "qwen/qwen-3-coder:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "nousresearch/hermes-2-pro-llama-3-8b",
+]
+
 def call_openrouter(prompt):
     headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
-    try:
-        r = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json={
-                "model": "qwen/qwen-3-coder:free",
-                "messages": [{"role": "user", "content": prompt}]
-            }, timeout=15
-        )
-        return r.json()["choices"][0]["message"]["content"].strip()
-    except:
-        return "Intelligence fallback active: Manual review required for 2026 Material Compliance."
+    for model in ANALYSIS_MODELS:
+        try:
+            r = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "You are an automotive engineering expert."},
+                        {"role": "user", "content": prompt}
+                    ]
+                },
+                timeout=15
+            )
+            if r.status_code == 200:
+                return r.json()["choices"][0]["message"]["content"].strip()
+        except:
+            continue
+    return "Intelligence fallback active: Manual review required."
+
 
 def run_image_engine(prompt, base_image=None):
     try:
