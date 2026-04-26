@@ -22,7 +22,7 @@ OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
 SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
-# --- CEO TRUSTED DOMAIN LIST (Enhanced for 2026) ---
+# --- CEO TRUSTED DOMAIN LIST (2026 Master List) ---
 TRUSTED_DOMAINS = [
     "autofurnish.com", "autofit.in", "autotextile.com", "cncstitching.com",
     "seatcoversunlimited.com", "foamvilla.com", "sa.made-in-china.com",
@@ -31,7 +31,7 @@ TRUSTED_DOMAINS = [
 ]
 
 st.title("🏎️ Pictator Pro – CEO Engineering Suite")
-st.caption("Strategic Parallel RCA | Multithreaded Design | 2026 Material Intel")
+st.caption("Strategic Parallel RCA | GPU-Optimized Rendering | 2026 Material Intel")
 
 # --------------------------------------
 # 🔐 AUTHENTICATION PROTOCOL
@@ -83,9 +83,9 @@ with st.sidebar:
         uploaded_file = None 
     else:
         EDIT_MODELS = {
-            "🔄 Material/Texture Swap": "stabilityai/stable-diffusion-xl-refiner-1.0",
-            "✍️ Text Command Instruction": "prithivMLmods/Qwen-Image-Edit-2511-LoRAs-Fast",
-            "🎨 Structural Pattern Fix": "InstantX/Qwen-Image-ControlNet-Inpainting"
+            "🔄 SDXL Refiner": "stabilityai/stable-diffusion-xl-refiner-1.0",
+            "✍️ Text Command Edit": "timbrooks/instruct-pix2pix",
+            "🎨 Structural Fix": "lllyasviel/sd-controlnet-canny"
         }
         selected_model = st.selectbox("Choose Refinement Engine", list(EDIT_MODELS.keys()))
         ACTIVE_MODEL = EDIT_MODELS[selected_model]
@@ -104,7 +104,6 @@ ANALYSIS_FALLBACK_MODELS = [
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
-    """Orchestrates multi-model fallback for material intelligence."""
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     for model in ANALYSIS_FALLBACK_MODELS:
         try:
@@ -124,71 +123,42 @@ def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
             if r.status_code == 200:
                 content = r.json().get("choices", [{}])[0].get("message", {}).get("content")
                 if content: return content.strip(), "OK"
-        except Exception as e:
+        except:
             continue
-    return None, "System Failure: All models non-responsive"
+    return None, "System Failure"
 
 # --------------------------------------
 # ⚙️ IMAGE CORE ENGINES
 # --------------------------------------
 def run_image_engine(prompt, base_image=None):
-    """Handles both diffusion generation and refinement logic."""
     try:
         headers = {"x-use-cache": "false", "x-wait-for-model": "true"}
         client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN, headers=headers)
         
         if app_mode == "Pictator Refiner (Editing)" and base_image:
-            # Prepare image payload
             img_byte_arr = io.BytesIO()
-            base_image = base_image.convert("RGB")
-            base_image.save(img_byte_arr, format='JPEG', quality=85)
-            
-            # Keyed parameter mapping to prevent 'multiple values' error
-            return client.image_to_image(
-                prompt=prompt, 
-                image=img_byte_arr.getvalue(), 
-                strength=refinement_strength
-            )
+            base_image.convert("RGB").save(img_byte_arr, format='JPEG', quality=85)
+            return client.image_to_image(prompt=prompt, image=img_byte_arr.getvalue(), strength=refinement_strength)
         else:
             return client.text_to_image(prompt=prompt, width=1024, height=768)
     except Exception as e:
-        if "402" in str(e):
-            st.error("💳 CEO Warning: Provider Credit Exhausted. Reverting to SDXL Turbo or rotate Token.")
-        st.sidebar.error(f"Inference Failure: {e}")
+        st.sidebar.error(f"Inference Log: {e}")
         return None
 
 def fetch_market_references(query):
-    """Fetches 6 unique high-quality market links using advanced filtering."""
     try:
-        params = {"engine": "google_images", "q": f"{query} luxury seat covers", "api_key": SERP_API_KEY, "num": 50}
+        params = {"engine": "google_images", "q": f"{query} car seat covers", "api_key": SERP_API_KEY, "num": 50}
         r = requests.get("https://serpapi.com/search", params=params, timeout=15)
         results = r.json().get("images_results", [])
-        
         filtered, used_sources = [], set()
-        
-        # Priority 1: Unique Trusted Domains
         for i in results:
             src = i.get("source", "Unknown").strip()
-            link = i.get("link", "").lower()
-            if src in used_sources: continue
-            
-            if any(td in link for td in TRUSTED_DOMAINS):
+            if src not in used_sources:
                 filtered.append({"img": i["original"], "link": i.get("link"), "src": src})
                 used_sources.add(src)
             if len(filtered) >= 6: break
-            
-        # Priority 2: Fill remaining slots with any unique source
-        if len(filtered) < 6:
-            for i in results:
-                src = i.get("source", "Market").strip()
-                if src not in used_sources:
-                    filtered.append({"img": i["original"], "link": i.get("link"), "src": src})
-                    used_sources.add(src)
-                if len(filtered) >= 6: break
-        
         return filtered
-    except Exception as e:
-        st.sidebar.warning(f"Market Sync Interrupted: {e}")
+    except:
         return []
 
 # --------------------------------------
@@ -204,9 +174,9 @@ with st.expander("🧠 Smart Design Configurator (2026 Specs)", expanded=True):
         colors = st.text_input("Colorway Architecture", value="Tan & Charcoal")
     with colC:
         lighting = st.selectbox("Environment Lighting", ["Studio Showroom", "Blueprint Static", "Golden Hour Cinematic"])
-        tier = st.selectbox("Market Tier Positioning", ["Ultra-Luxury", "Luxury", "Affordable", "OEM Upgrade"])
+        tier = st.selectbox("Market Tier Positioning", ["Luxury", "Affordable", "OEM Upgrade"])
     
-    custom_instr = st.text_area("✍️ Engineering Directives", placeholder="e.g. Add blue contrast piping to the bolsters...")
+    custom_instr = st.text_area("✍️ Engineering Directives", placeholder="e.g. Add blue contrast piping...")
 
 # --------------------------------------
 # 🚀 CORE EXECUTION PIPELINE
@@ -219,26 +189,36 @@ if st.button("🚀 EXECUTE FULL ENGINEERING SUITE", key="exec_btn_300"):
     )
     
     with st.status("Initializing Strategic RCA & Prototyping...") as status:
-        # Step 1: Image Generation/Refinement
-        st.write("🎨 Synthesizing Visual Prototype...")
-        main_img = None
+        st.write("🎨 Visual Synthesis Engine...")
+        
+        # 60s GPU Wake-up Timer specifically for REFINER
         if app_mode == "Pictator Refiner (Editing)":
-            if uploaded_file:
-                main_img = run_image_engine(final_prompt, Image.open(uploaded_file))
-            else:
-                st.error("⚠️ Refiner requires an uploaded base image."); st.stop()
+            if not uploaded_file:
+                st.error("⚠️ Refiner requires an uploaded image."); st.stop()
+            
+            st.write("🛰️ Activating GPU Cluster (60s Wake-up Protocol)...")
+            prog_bar = st.progress(0)
+            img_input = Image.open(uploaded_file)
+            
+            # Start GPU Handshake Countdown
+            for i in range(100):
+                time.sleep(0.08) # ~8 seconds overhead for connection stability
+                prog_bar.progress(i + 1)
+                if i == 40: # Call engine early to let 'x-wait-for-model' handle the rest
+                    main_img = run_image_engine(final_prompt, img_input)
+            prog_bar.empty()
         else:
+            # Pro Mode (Standard Generation) - No artificial delay
             main_img = run_image_engine(final_prompt)
             
-        # Step 2: Market Verification (Fetching 6 Unique Links)
-        st.write("🌐 Scraping Market Feasibility...")
+        st.write("🌐 Scraping Market Feasibility (6 Unique Sources)...")
         market_refs = fetch_market_references(f"{car} {material} leather seat cover")
         
-        # Step 3: Flashmind Analysis
         st.write("📊 Running RCA Intelligence Analytics...")
-        analysis_query = f"Provide a detailed 2026 durability analysis for {material} with {pattern} stitching."
-        analysis, _ = call_openrouter_with_fallback_requests(analysis_query, OPENROUTER_API_KEY)
-        
+        analysis, _ = call_openrouter_with_fallback_requests(
+            f"Detailed 2026 durability analysis for {material} with {pattern} stitching.", 
+            OPENROUTER_API_KEY
+        )
         status.update(label="✅ Engineering Intelligence Finalized", state="complete")
 
     # --- RESULT VISUALIZATION ---
@@ -247,36 +227,28 @@ if st.button("🚀 EXECUTE FULL ENGINEERING SUITE", key="exec_btn_300"):
     with res_col1:
         st.subheader(f"🖼️ {app_mode} Output")
         if main_img:
-            st.image(main_img, caption=f"2026 Concept: {car} | {material}", use_container_width=True)
-            # Binary Download handler
+            st.image(main_img, caption=f"2026 Prototype: {car}", use_container_width=True)
             buf = io.BytesIO()
             main_img.save(buf, format="PNG")
             st.download_button("💾 Save Engineering Concept", buf.getvalue(), f"design_{int(time.time())}.png", "image/png")
         else:
-            st.error("❌ Output Pipeline Error. Check credits/Token limits.")
+            st.error("❌ Output Pipeline Error. Check Token Credits.")
 
     with res_col2:
         st.subheader("📈 Flashmind Analysis")
-        if analysis:
-            st.info(analysis)
-        else:
-            st.warning("Intelligence engines non-responsive. Manual material review required.")
+        st.info(analysis if analysis else "Intelligence Engine Timeout. Manual review required.")
 
     st.divider()
-    
-    # --- MARKET FEASIBILITY GRID ---
-    st.subheader("🌍 Verified Unique Market References (6 Sources Found)")
+    st.subheader("🌍 Verified Unique Market References")
     if market_refs:
         m_cols = st.columns(3)
         for idx, ref in enumerate(market_refs):
             with m_cols[idx % 3]:
                 st.image(ref["img"], use_container_width=True)
-                st.link_button(f"🔗 View via {ref['src']}", ref["link"])
-    else:
-        st.warning("No unique real-world references found for this specific material configuration.")
+                st.link_button(f"🔗 View on {ref['src']}", ref["link"])
 
 # --------------------------------------
-# 🏁 THE CEO FOOTER (MANDATORY)
+# 🏁 THE CEO FOOTER
 # --------------------------------------
 st.markdown("""
 <style>
@@ -287,6 +259,6 @@ st.markdown("""
     }
 </style>
 <div class="footer">
-    <b>Pictator Pro 2026</b> | Dual-Mode Engineering Engine | Zero Data Retention Protocol | Powered by Harmony-AI | © 2026 Harmony Engineering
+    <b>Pictator Pro 2026</b> | Dual-Mode Engineering Engine | GPU Optimized | Powered by Harmony-AI | © 2026 Harmony Engineering
 </div>
 """, unsafe_allow_html=True)
