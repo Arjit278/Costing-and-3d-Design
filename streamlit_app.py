@@ -97,19 +97,75 @@ def call_openrouter(prompt):
     except:
         return "Intelligence fallback active: Manual review required for 2026 Material Compliance."
 
+# --------------------------------------
+# ⚙️ ENGINES (REFINED FOR IMG2IMG)
+# --------------------------------------
 def run_image_engine(prompt, base_image=None):
     try:
         client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN)
-        if base_image and app_mode == "Pictator Refiner (Edit)":
+        
+        if app_mode == "Pictator Refiner (Edit)" and base_image:
+            # Prepare image for Refinement
             img_byte_arr = io.BytesIO()
-            base_image.save(img_byte_arr, format='PNG')
-            # Specialized Image-to-Image call
-            return client.image_to_image(prompt, image=img_byte_arr.getvalue(), strength=refinement_strength)
+            # Ensure the image is in RGB and not too large for the API
+            base_image = base_image.convert("RGB")
+            base_image.save(img_byte_arr, format='JPEG', quality=95)
+            
+            # API Call for Refiner
+            output = client.image_to_image(
+                prompt, 
+                image=img_byte_arr.getvalue(), 
+                strength=refinement_strength,
+                guidance_scale=7.5
+            )
+            return output
         else:
+            # Standard Generation
             return client.text_to_image(prompt, width=1024, height=768)
+            
     except Exception as e:
-        st.error(f"Engine Error: {e}")
+        st.sidebar.error(f"Engine Detail: {e}")
+        # Secondary Fallback for Refiner: If API fails, try the base model
         return None
+
+# --------------------------------------
+# 🚀 EXECUTION (UI PLACEMENT FIX)
+# --------------------------------------
+if st.button("🚀 EXECUTE ENGINEERING SUITE"):
+    final_prompt = (
+        f"Automotive interior, {car} custom seat covers, {pattern} {material}, {colors}, "
+        f"{custom_instruction}, 8k ultra-realistic, highly detailed leather texture."
+    )
+    
+    with st.status("Processing Engineering Request...") as status:
+        main_img = None
+        if app_mode == "Pictator Refiner (Edit)":
+            if uploaded_file:
+                st.write("🔄 Refining uploaded design...")
+                input_img = Image.open(uploaded_file)
+                main_img = run_image_engine(final_prompt, input_img)
+            else:
+                st.warning("⚠️ Upload an image to refine.")
+                st.stop()
+        else:
+            st.write("🎨 Generating base design...")
+            main_img = run_image_engine(final_prompt)
+            
+        market_refs = fetch_market_references(f"{car} {material} seat cover")
+        analysis = call_openrouter(f"Durability analysis: {material} + {pattern}.")
+        status.update(label="✅ Engineering Complete", state="complete")
+
+    # Display results prominently
+    if main_img:
+        st.subheader(f"🖼️ {app_mode} Output")
+        st.image(main_img, use_container_width=True)
+        
+        # Download handler
+        buf = io.BytesIO()
+        main_img.save(buf, format="PNG")
+        st.download_button("💾 Save Concept", buf.getvalue(), "design_2026.png", "image/png")
+    else:
+        st.error("❌ Output Failed. Check if the HF Model is currently loading or try a different Refinement Engine.")
 
 def fetch_market_references(query):
     try:
