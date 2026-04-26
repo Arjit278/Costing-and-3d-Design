@@ -183,13 +183,25 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE"):
                 st.link_button(f"🔗 View on {ref['src']}", ref["link"])
 
 # --------------------------------------
-# 🏁 FOOTER
+# 🏁 THE CEO FOOTER (FIXED)
 # --------------------------------------
 st.markdown("""
 <style>
-.footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: #0e1117; color: #555; text-align: center; padding: 10px; font-size: 12px; border-top: 1px solid #333; z-index: 100; }
+    .footer { 
+        position: fixed; 
+        left: 0; 
+        bottom: 0; 
+        width: 100%; 
+        background-color: #0e1117; 
+        color: #555; 
+        text-align: center; 
+        padding: 10px; 
+        font-size: 12px; 
+        border-top: 1px solid #333; 
+        z-index: 100; 
+    }
 </style>
 <div class="footer">
     <b>Pictator Pro 2026</b> | Dual-Mode Engineering Engine | Zero Data Retention Protocol | © 2026 Harmony Engineering
 </div>
-""", unsafe_content_allowed=True)
+""", unsafe_allow_html=True) # Changed from unsafe_content_allowed
