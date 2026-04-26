@@ -50,11 +50,9 @@ if not st.session_state.authenticated:
 # ⚡ FLASHMIND ENGINE (OPENROUTER)
 # --------------------------------------
 ANALYSIS_MODELS = [
-    "qwen/qwen3-coder:free",
-    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "qwen/qwen-3-coder:free",
     "meta-llama/llama-3.2-3b-instruct:free",
     "nousresearch/hermes-2-pro-llama-3-8b",
-    "qwen/qwen3-next-80b-a3b-instruct:free",
 ]
 
 def call_openrouter(prompt):
@@ -83,6 +81,7 @@ def call_openrouter(prompt):
 # 🛠️ IMAGE & MARKET ENGINES
 # --------------------------------------
 def generate_ai_image(prompt, model_id):
+    """GENERATE: Pure AI Design Concept"""
     try:
         client = InferenceClient(model=model_id, token=HF_TOKEN)
         return client.text_to_image(prompt, width=1024, height=768)
@@ -91,6 +90,7 @@ def generate_ai_image(prompt, model_id):
         return None
 
 def fetch_market_references(query):
+    """REFERENCE: Real-World Market Photos"""
     try:
         params = {"engine": "google_images", "q": f"{query} luxury seat cover 2026", "api_key": SERP_API_KEY, "num": 10}
         r = requests.get("https://serpapi.com/search", params=params, timeout=10)
@@ -105,8 +105,6 @@ def fetch_market_references(query):
 MODEL_OPTIONS = {
     "⚡ FLUX.1 Schnell": "black-forest-labs/FLUX.1-schnell",
     "🔥 FLUX.1 Dev": "black-forest-labs/FLUX.1-dev",
-    "🔥 Krea Dev (Ultra Realistic)": "black-forest-labs/FLUX.1-Krea-dev",
-    "🧠 Qwen Image (Balanced AI)": "Qwen/Qwen-Image",
     "✨ SD 3.5 Large": "stabilityai/stable-diffusion-3.5-large"
 }
 selected_model = st.sidebar.selectbox("Choose AI Model", list(MODEL_OPTIONS.keys()))
@@ -114,42 +112,46 @@ selected_model = st.sidebar.selectbox("Choose AI Model", list(MODEL_OPTIONS.keys
 with st.expander("🧠 Smart Design Configurator (2026 Specs)", expanded=True):
     colA, colB, colC = st.columns(3)
     with colA:
-        car = st.selectbox("Vehicle", ["Maruti Wagon R", "Maruti Grand Vitara", "Any Car mention in prompt"])
+        car = st.selectbox("Vehicle", ["Maruti Wagon R", "Maruti Grand Vitara", "Custom/Other"])
         pattern = st.selectbox("Stitching", ["Ultra-Quilt Diamond", "Hex-Cell", "Puff", "Minimalist Flat"])
     with colB:
-        material = st.selectbox("Material", ["1200 GSM Nappa", "Cotton", "Synthetic leather",  "Carbon Fiber Leather"])
-        colors = st.text_input("Colorway", "Dual", "Tan & Charcoal")
+        material = st.selectbox("Material", ["1200 GSM Nappa", "Cotton", "Synthetic Leather", "Carbon Fiber Leather"])
+        # FIXED: Removed the extra positional argument that caused the TypeError
+        colors = st.text_input("Colorway", value="Tan & Charcoal")
     with colC:
         lighting = st.selectbox("Lighting", ["Studio", "Blueprint", "Cinematic Showroom"])
-        market = st.selectbox("Market Tier", ["Luxury", "Affordeable", "Sports", "OEM Upgrade"])
+        market = st.selectbox("Market Tier", ["Luxury", "Affordable", "Sports", "OEM Upgrade"])
     
-    custom_instruction = st.text_area("✍️ Custom Engineering Instructions", placeholder="Add specific details...")
+    custom_instruction = st.text_area("✍️ Custom Engineering Instructions", placeholder="Add specific details like contrast piping or perforation...")
 
 # --------------------------------------
 # 🚀 EXECUTION PIPELINE
 # --------------------------------------
 if st.button("🚀 EXECUTE FULL SUITE"):
-    final_prompt = f"Automotive interior, {car} custom seat covers, {pattern} {material}, {colors}, {custom_instruction}, {lighting}, 8k ultra-detailed."
+    final_prompt = (
+        f"Professional automotive interior photography, {car} custom seat covers, "
+        f"{pattern} pattern, premium {material}, {colors} theme, "
+        f"{custom_instruction}, {lighting} lighting, 8k ultra-realistic, material macro detail."
+    )
     
     with st.status("Engineering Intelligence...") as status:
-        st.write("🎨 Rendering Main Design...")
+        st.write("🎨 Generating AI Design Concept...")
         main_img = generate_ai_image(final_prompt, MODEL_OPTIONS[selected_model])
         
-        st.write("🌐 Sourcing Verified Market Links...")
-        market_refs = fetch_market_references(f"{car} {material}")
+        st.write("🌐 Fetching Real-World Market References...")
+        market_refs = fetch_market_references(f"{car} {material} seat cover")
         
         st.write("📊 Analyzing Material Trends...")
-        analysis = call_openrouter(f"Briefly analyze the durability and 2026 market trend for {material} with {pattern} stitching.")
+        analysis = call_openrouter(f"Briefly analyze durability and 2026 trends for {material} with {pattern} stitching.")
         
         status.update(label="✅ Analysis Complete", state="complete")
 
-    # Layout Results
     col_left, col_right = st.columns([2, 1])
     
     with col_left:
-        st.subheader("🎨 Featured Design Concept")
+        st.subheader("🎨 AI-Generated Design Concept")
         if main_img:
-            st.image(main_img, use_container_width=True)
+            st.image(main_img, caption=f"AI Vision: {car} in {material}", use_container_width=True)
             buf = io.BytesIO()
             main_img.save(buf, format="PNG")
             st.download_button("💾 Save Concept", buf.getvalue(), "design_2026.png")
@@ -159,20 +161,14 @@ if st.button("🚀 EXECUTE FULL SUITE"):
         st.info(analysis)
 
     st.divider()
-    st.subheader("🌍 Verified Market References & Live Shop Links")
+    st.subheader("🌍 Verified Market References & Live Shop Links (Real Photos)")
     if market_refs:
         m_cols = st.columns(3)
         for idx, ref in enumerate(market_refs):
             with m_cols[idx % 3]:
-                st.image(ref["img"], use_container_width=True)
+                st.image(ref["img"], caption=f"Ref from {ref['src']}", use_container_width=True)
                 st.link_button(f"🔗 View on {ref['src']}", ref["link"])
 
-# --------------------------------------
-# 📈 TRENDS EXPANDER
-# --------------------------------------
 with st.expander("📊 2026 Tech & Model Trends"):
-    st.markdown("""
-    - **OpenRouter ZDR:** Essential for keeping your design prompts private.
-    - **Qwen-3 Coder:** Best-in-class for understanding technical material properties.
-    - **Multithreaded Search:** Market links are now verified in real-time against trusted domains.
-    """)
+    st.write("- **AI Concepts:** Generated via black-forest-labs (FLUX) for prototype visualization.")
+    st.write("- **Market Refs:** Sourced via SERP to ensure engineering feasibility.")
