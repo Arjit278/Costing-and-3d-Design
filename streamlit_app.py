@@ -62,9 +62,9 @@ with st.sidebar:
     
     if app_mode == "Pictator Pro (Base)":
         BASE_MODELS = {
-            "⚡ FLUX.1 Schnell": "black-forest-labs/FLUX.1-schnell",
-            "🔥 FLUX.1 Dev": "black-forest-labs/FLUX.1-dev",
-            "✨ SD 3.5 Large": "stabilityai/stable-diffusion-3.5-large"
+            "⚡ Virtual Prototype (Fastest)": "stabilityai/sdxl-turbo",
+            "✨ Virtual Advanced": "stabilityai/stable-diffusion-xl-base-1.0",
+            "🎨 Realistic Vision": "SG161222/Realistic_Vision_V6.0_B1_noVAE"
         }
         selected_model = st.selectbox("Choose AI Model", list(BASE_MODELS.keys()))
         ACTIVE_MODEL = BASE_MODELS[selected_model]
@@ -72,7 +72,7 @@ with st.sidebar:
     else:
         EDIT_MODELS = {
             "🔄 Material Swap": "stabilityai/stable-diffusion-xl-refiner-1.0",
-            "🎨 Pattern Fix": "kandinsky-community/kandinsky-2-2-controlnet-depth",
+            "🎨 Pattern Fix": "lllyasviel/sd-controlnet-canny",
             "✍️ Text Command": "timbrooks/instruct-pix2pix"
         }
         selected_model = st.selectbox("Choose Refinement Engine", list(EDIT_MODELS.keys()))
