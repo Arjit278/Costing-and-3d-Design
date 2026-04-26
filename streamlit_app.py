@@ -68,6 +68,7 @@ with st.sidebar:
         }
         selected_model = st.selectbox("Choose AI Model", list(BASE_MODELS.keys()))
         ACTIVE_MODEL = BASE_MODELS[selected_model]
+        uploaded_file = None 
     else:
         EDIT_MODELS = {
             "🔄 Material Swap": "stabilityai/stable-diffusion-xl-refiner-1.0",
@@ -97,75 +98,24 @@ def call_openrouter(prompt):
     except:
         return "Intelligence fallback active: Manual review required for 2026 Material Compliance."
 
-# --------------------------------------
-# ⚙️ ENGINES (REFINED FOR IMG2IMG)
-# --------------------------------------
 def run_image_engine(prompt, base_image=None):
     try:
         client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN)
-        
         if app_mode == "Pictator Refiner (Edit)" and base_image:
-            # Prepare image for Refinement
             img_byte_arr = io.BytesIO()
-            # Ensure the image is in RGB and not too large for the API
             base_image = base_image.convert("RGB")
             base_image.save(img_byte_arr, format='JPEG', quality=95)
-            
-            # API Call for Refiner
-            output = client.image_to_image(
+            return client.image_to_image(
                 prompt, 
                 image=img_byte_arr.getvalue(), 
                 strength=refinement_strength,
                 guidance_scale=7.5
             )
-            return output
         else:
-            # Standard Generation
             return client.text_to_image(prompt, width=1024, height=768)
-            
     except Exception as e:
         st.sidebar.error(f"Engine Detail: {e}")
-        # Secondary Fallback for Refiner: If API fails, try the base model
         return None
-
-# --------------------------------------
-# 🚀 EXECUTION (UI PLACEMENT FIX)
-# --------------------------------------
-if st.button("🚀 EXECUTE ENGINEERING SUITE"):
-    final_prompt = (
-        f"Automotive interior, {car} custom seat covers, {pattern} {material}, {colors}, "
-        f"{custom_instruction}, 8k ultra-realistic, highly detailed leather texture."
-    )
-    
-    with st.status("Processing Engineering Request...") as status:
-        main_img = None
-        if app_mode == "Pictator Refiner (Edit)":
-            if uploaded_file:
-                st.write("🔄 Refining uploaded design...")
-                input_img = Image.open(uploaded_file)
-                main_img = run_image_engine(final_prompt, input_img)
-            else:
-                st.warning("⚠️ Upload an image to refine.")
-                st.stop()
-        else:
-            st.write("🎨 Generating base design...")
-            main_img = run_image_engine(final_prompt)
-            
-        market_refs = fetch_market_references(f"{car} {material} seat cover")
-        analysis = call_openrouter(f"Durability analysis: {material} + {pattern}.")
-        status.update(label="✅ Engineering Complete", state="complete")
-
-    # Display results prominently
-    if main_img:
-        st.subheader(f"🖼️ {app_mode} Output")
-        st.image(main_img, use_container_width=True)
-        
-        # Download handler
-        buf = io.BytesIO()
-        main_img.save(buf, format="PNG")
-        st.download_button("💾 Save Concept", buf.getvalue(), "design_2026.png", "image/png")
-    else:
-        st.error("❌ Output Failed. Check if the HF Model is currently loading or try a different Refinement Engine.")
 
 def fetch_market_references(query):
     try:
@@ -173,8 +123,6 @@ def fetch_market_references(query):
         r = requests.get("https://serpapi.com/search", params=params, timeout=10)
         results = r.json().get("images_results", [])
         filtered, used_sources = [], set()
-        
-        # Step 1: Filter unique trusted domains
         for i in results:
             src_name = i.get("source", "").strip()
             link = i.get("link", "").lower()
@@ -183,8 +131,6 @@ def fetch_market_references(query):
                 filtered.append({"img": i["original"], "link": i.get("link"), "src": src_name})
                 used_sources.add(src_name)
             if len(filtered) >= 6: break
-        
-        # Step 2: Fallback to unique sources if < 6
         if len(filtered) < 6:
             for i in results:
                 src_name = i.get("source", "").strip()
@@ -210,10 +156,10 @@ with st.expander("🧠 Smart Design Configurator (2026 Specs)", expanded=True):
         lighting = st.selectbox("Lighting", ["Studio", "Blueprint", "Cinematic Showroom"])
         market = st.selectbox("Market Tier", ["Luxury", "Affordable", "Sports", "OEM Upgrade"])
     
-    custom_instruction = st.text_area("✍️ Engineering Instructions", placeholder="e.g. Add blue contrast stitching or specific perforation details...")
+    custom_instruction = st.text_area("✍️ Engineering Instructions", placeholder="Add blue contrast stitching or specific perforation details...")
 
 # --------------------------------------
-# 🚀 EXECUTION
+# 🚀 SINGLE-THREAD EXECUTION
 # --------------------------------------
 if st.button("🚀 EXECUTE ENGINEERING SUITE"):
     final_prompt = (
@@ -222,19 +168,20 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE"):
         f"{custom_instruction}, {lighting} lighting, 8k ultra-realistic, material macro detail."
     )
     
-    with st.status("Processing Virtual Prototype...") as status:
-        st.write(f"🎨 Activating {app_mode} Engine...")
-        # Check for image if in Refiner mode
-        base_img = None
+    with st.status("Processing Engineering Request...") as status:
+        main_img = None
         if app_mode == "Pictator Refiner (Edit)":
             if uploaded_file:
-                base_img = Image.open(uploaded_file)
+                st.write("🔄 Refining uploaded design...")
+                input_img = Image.open(uploaded_file)
+                main_img = run_image_engine(final_prompt, input_img)
             else:
                 st.error("⚠️ Please upload an image to use the Refiner mode.")
                 st.stop()
-        
-        main_img = run_image_engine(final_prompt, base_img)
-        
+        else:
+            st.write("🎨 Generating base design...")
+            main_img = run_image_engine(final_prompt)
+            
         st.write("🌐 Verifying Unique Market Links...")
         market_refs = fetch_market_references(f"{car} {material} seat cover")
         
@@ -250,7 +197,9 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE"):
             st.image(main_img, use_container_width=True)
             buf = io.BytesIO()
             main_img.save(buf, format="PNG")
-            st.download_button("💾 Save Prototype", buf.getvalue(), f"pictator_{int(time.time())}.png")
+            st.download_button("💾 Save Prototype", buf.getvalue(), f"pictator_{int(time.time())}.png", "image/png")
+        else:
+            st.error("❌ Output Failed. Check if the HF Model is currently loading.")
 
     with col_right:
         st.subheader("📈 Flashmind Analysis")
@@ -265,7 +214,7 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE"):
                 st.image(ref["img"], use_container_width=True)
                 st.link_button(f"🔗 View on {ref['src']}", ref["link"])
     else:
-        st.warning("No unique market references found for this configuration.")
+        st.warning("No unique market references found.")
 
 # --------------------------------------
 # 🏁 THE CEO FOOTER
@@ -273,17 +222,9 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE"):
 st.markdown("""
 <style>
     .footer { 
-        position: fixed; 
-        left: 0; 
-        bottom: 0; 
-        width: 100%; 
-        background-color: #0e1117; 
-        color: #555; 
-        text-align: center; 
-        padding: 10px; 
-        font-size: 12px; 
-        border-top: 1px solid #333; 
-        z-index: 100; 
+        position: fixed; left: 0; bottom: 0; width: 100%; 
+        background-color: #0e1117; color: #555; text-align: center; 
+        padding: 10px; font-size: 12px; border-top: 1px solid #333; z-index: 100; 
     }
 </style>
 <div class="footer">
