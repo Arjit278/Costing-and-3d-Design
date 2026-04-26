@@ -15,7 +15,6 @@ st.caption("Strategic Parallel RCA | Multithreaded Design | 2026 Material Intel"
 # --------------------------------------
 # 🔐 SECRETS & AUTH
 # --------------------------------------
-# Ensure these are set in your .streamlit/secrets.toml
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
 
@@ -44,7 +43,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # --------------------------------------
-# 🎨 MODEL CONFIG (2026 Optimized)
+# 🎨 MODEL CONFIG
 # --------------------------------------
 MODEL_OPTIONS = {
     "⚡ FLUX.1 Schnell": "black-forest-labs/FLUX.1-schnell",
@@ -55,34 +54,27 @@ selected_model = st.sidebar.selectbox("Choose Generation Model", list(MODEL_OPTI
 ACTIVE_MODEL = MODEL_OPTIONS[selected_model]
 
 # --------------------------------------
-# 🛠️ IMAGE ENGINES
+# 🛠️ ENGINES
 # --------------------------------------
 def generate_ai_image(prompt):
     if not HF_TOKEN:
         st.error("Missing HF_TOKEN in Secrets!")
         return None
     try:
-        # Initialize client with token
         client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN)
-        image = client.text_to_image(
+        return client.text_to_image(
             prompt,
             width=1024,
             height=768,
             num_inference_steps=4 if "schnell" in ACTIVE_MODEL.lower() else 28
         )
-        return image
     except Exception as e:
         st.sidebar.error(f"HF Error: {e}")
         return None
 
 def fetch_market_images(query):
     try:
-        params = {
-            "engine": "google_images",
-            "q": f"{query} luxury interior leather 2026",
-            "api_key": SERP_API_KEY,
-            "num": 6
-        }
+        params = {"engine": "google_images", "q": f"{query} 2026", "api_key": SERP_API_KEY, "num": 6}
         r = requests.get("https://serpapi.com/search", params=params, timeout=10)
         return [img.get("original") for img in r.json().get("images_results", [])]
     except:
@@ -102,17 +94,21 @@ with st.expander("🧠 Smart Design Configurator (2026 Specs)", expanded=True):
     with colC:
         lighting = st.selectbox("Lighting", ["Studio Photography", "Cinematic Showroom"])
         market = st.selectbox("Market", ["Luxury", "OEM Upgrade"])
+    
+    # REINSTATED CUSTOM PROMPT BOX
+    custom_instruction = st.text_area("✍️ Custom Engineering Instructions", 
+                                    placeholder="e.g. Add subtle red piping, perforated texture, mahogany accents...")
 
 # --------------------------------------
 # 🚀 EXECUTION PIPELINE
 # --------------------------------------
 if st.button("🚀 EXECUTE FULL SUITE"):
-    # Refined prompt for "Proper Designing"
+    # Hybrid Prompt Construction
     final_prompt = (
-        f"High-end automotive interior design, close-up of {car} custom seat covers, "
+        f"High-end automotive interior design, {car} custom seat covers, "
         f"{pattern} pattern, premium {material}, {colors} color scheme, "
-        f"meticulous stitching detail, {lighting}, 8k resolution, highly realistic, "
-        f"commercial automotive photography."
+        f"{custom_instruction if custom_instruction else ''}, "
+        f"meticulous stitching detail, {lighting}, 8k resolution, highly realistic."
     )
     
     with st.status("Engineering Intelligence...") as status:
@@ -131,7 +127,7 @@ if st.button("🚀 EXECUTE FULL SUITE"):
         main_img.save(buf, format="PNG")
         st.download_button("💾 Save Concept", buf.getvalue(), "design_2026.png", "image/png")
     else:
-        st.error("Main image failed. Please verify your HF_TOKEN permissions.")
+        st.error("Main image failed. Ensure your HF_TOKEN has 'Read' permissions.")
 
     st.subheader("🌍 Verified Market Links & Reference Designs")
     if market_photos:
