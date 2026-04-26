@@ -57,7 +57,6 @@ if not st.session_state.authenticated:
 # --------------------------------------
 with st.sidebar:
     st.divider()
-    # Unique key ensures no DuplicateElementId error
     app_mode = st.radio("🚀 Select Suite Mode", ["Pictator Pro (Base)", "Pictator Refiner (Edit)"], key="mode_sel_final")
     
     if app_mode == "Pictator Pro (Base)":
@@ -81,25 +80,66 @@ with st.sidebar:
         refinement_strength = st.slider("Refinement Strength", 0.1, 0.9, 0.5)
 
 # --------------------------------------
-# ⚙️ ENGINES
+# ⚡ FLASHMIND ENGINE (Your Working Fallback)
 # --------------------------------------
-def call_openrouter(prompt):
-    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
-    try:
-        r = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json={
-            "model": "qwen/qwen-3-coder:free",
-            "messages": [{"role": "user", "content": prompt}]
-        }, timeout=15)
-        return r.json()["choices"][0]["message"]["content"].strip()
-    except:
-        return "Intelligence fallback active: Manual review required for 2026 Material Compliance."
+ANALYSIS_FALLBACK_MODELS = [
+    "qwen/qwen-3-coder:free",
+    "qwen/qwen3-next-80b-a3b-instruct",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "nousresearch/hermes-2-pro-llama-3-8b",
+]
 
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    for model in ANALYSIS_FALLBACK_MODELS:
+        try:
+            r = requests.post(
+                OPENROUTER_URL,
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "You are an automotive engineering expert."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.2
+                },
+                timeout=60
+            )
+            if r.status_code == 200:
+                data = r.json()
+                content = data.get("choices", [{}])[0].get("message", {}).get("content")
+                if content:
+                    return content.strip(), "OK"
+            elif r.status_code == 429:
+                time.sleep(2)
+        except:
+            continue
+    return None, "All models failed"
+
+def safe_json_extract(text):
+    try:
+        text = str(text)
+        return json.loads(text)
+    except:
+        pass
+    try:
+        match = re.search(r"\[\s*{.*?}\s*\]", text, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+    except:
+        pass
+    return []
+
+# --------------------------------------
+# ⚙️ IMAGE ENGINES
+# --------------------------------------
 def run_image_engine(prompt, base_image=None):
     try:
-        # Headers prevent caching issues during rapid prototyping
         headers = {"x-use-cache": "false"}
         client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN, headers=headers)
-        
         if app_mode == "Pictator Refiner (Edit)" and base_image:
             img_byte_arr = io.BytesIO()
             base_image = base_image.convert("RGB")
@@ -109,7 +149,7 @@ def run_image_engine(prompt, base_image=None):
             return client.text_to_image(prompt=prompt, width=1024, height=768)
     except Exception as e:
         if "402" in str(e):
-            st.error("💳 CEO Error: Provider Credit Exhausted. Switching to SDXL Turbo is recommended.")
+            st.error("💳 CEO Error: Provider Credit Exhausted. Switching to 'SDXL Turbo' is recommended.")
         st.sidebar.error(f"Engine Detail: {e}")
         return None
 
@@ -121,19 +161,10 @@ def fetch_market_references(query):
         filtered, used = [], set()
         for i in results:
             src = i.get("source", "").strip()
-            link = i.get("link", "").lower()
-            if src in used: continue
-            if any(td in link for td in TRUSTED_DOMAINS):
+            if src not in used and any(td in i.get("link", "").lower() for td in TRUSTED_DOMAINS):
                 filtered.append({"img": i["original"], "link": i.get("link"), "src": src})
                 used.add(src)
             if len(filtered) >= 6: break
-        if len(filtered) < 6:
-            for i in results:
-                src = i.get("source", "").strip()
-                if src not in used and "link" in i:
-                    filtered.append({"img": i["original"], "link": i.get("link"), "src": src})
-                    used.add(src)
-                if len(filtered) >= 6: break
         return filtered
     except: return []
 
@@ -174,8 +205,15 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE", key="exec_btn_master"):
         else:
             main_img = run_image_engine(final_prompt)
             
+        st.write("🌐 Verifying Unique Market Links...")
         market_refs = fetch_market_references(f"{car} {material} seat cover")
-        analysis = call_openrouter(f"Briefly analyze durability and 2026 trends for {material} with {pattern} stitching.")
+        
+        st.write("📊 Finalizing RCA Analysis...")
+        # CALLING YOUR CUSTOM OPENROUTER FUNCTION
+        analysis, status_code = call_openrouter_with_fallback_requests(
+            f"Briefly analyze durability and 2026 trends for {material} with {pattern} stitching.",
+            OPENROUTER_API_KEY
+        )
         status.update(label="✅ Engineering Complete", state="complete")
 
     # Display Results
@@ -191,7 +229,10 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE", key="exec_btn_master"):
 
     with col_right:
         st.subheader("📈 Flashmind Analysis")
-        st.info(analysis)
+        if analysis:
+            st.info(analysis)
+        else:
+            st.warning("Intelligence Engine timed out. Manual review required.")
 
     st.divider()
     st.subheader("🌍 Verified Unique Market References")
