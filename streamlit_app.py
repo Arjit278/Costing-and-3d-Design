@@ -56,29 +56,33 @@ if not st.session_state.authenticated:
 # --------------------------------------
 # ⚡ MODE TOGGLE & MODEL STACK
 # --------------------------------------
+# --------------------------------------
+# ⚡ EMERGENCY MODEL STACK (Free Tier Stable)
+# --------------------------------------
 with st.sidebar:
     st.divider()
     app_mode = st.radio("🚀 Select Suite Mode", ["Pictator Pro (Base)", "Pictator Refiner (Edit)"])
     
     if app_mode == "Pictator Pro (Base)":
+        # Swapping FLUX for SDXL Turbo & Realistic Vision (High Free Availability)
         BASE_MODELS = {
-            "⚡ Virtual Prototype (Fastest)": "stabilityai/sdxl-turbo",
-            "✨ Virtual Advanced": "stabilityai/stable-diffusion-xl-base-1.0",
-            "🎨 Realistic Vision": "SG161222/Realistic_Vision_V6.0_B1_noVAE"
+            "⚡ SDXL Turbo (High Speed)": "stabilityai/sdxl-turbo",
+            "✨ SDXL Base 1.0": "stabilityai/stable-diffusion-xl-base-1.0",
+            "🎨 Realistic Vision V6": "SG161222/Realistic_Vision_V6.0_B1_noVAE"
         }
         selected_model = st.selectbox("Choose AI Model", list(BASE_MODELS.keys()))
         ACTIVE_MODEL = BASE_MODELS[selected_model]
-        uploaded_file = None 
     else:
+        # Refiner models that use community compute
         EDIT_MODELS = {
             "🔄 Material Swap": "stabilityai/stable-diffusion-xl-refiner-1.0",
-            "🎨 Pattern Fix": "lllyasviel/sd-controlnet-canny",
+            "🎨 Pattern Fix (Canny)": "lllyasviel/sd-controlnet-canny",
             "✍️ Text Command": "timbrooks/instruct-pix2pix"
         }
         selected_model = st.selectbox("Choose Refinement Engine", list(EDIT_MODELS.keys()))
         ACTIVE_MODEL = EDIT_MODELS[selected_model]
         uploaded_file = st.file_uploader("Upload Base Design", type=["png", "jpg", "jpeg"])
-        refinement_strength = st.slider("Refinement Strength", 0.1, 0.9, 0.5)
+        refinement_strength = st.slider("Refinement Strength", 0.1, 0.9, 0.5)    
 
 # --------------------------------------
 # ⚙️ ENGINES
@@ -113,22 +117,60 @@ def call_openrouter(prompt):
     return "Intelligence fallback active: Manual review required."
 
 
+# --------------------------------------
+# ⚡ EMERGENCY MODEL STACK (Free Tier Stable)
+# --------------------------------------
+with st.sidebar:
+    st.divider()
+    app_mode = st.radio("🚀 Select Suite Mode", ["Pictator Pro (Base)", "Pictator Refiner (Edit)"])
+    
+    if app_mode == "Pictator Pro (Base)":
+        # Swapping FLUX for SDXL Turbo & Realistic Vision (High Free Availability)
+        BASE_MODELS = {
+            "⚡ SDXL Turbo (High Speed)": "stabilityai/sdxl-turbo",
+            "✨ SDXL Base 1.0": "stabilityai/stable-diffusion-xl-base-1.0",
+            "🎨 Realistic Vision V6": "SG161222/Realistic_Vision_V6.0_B1_noVAE"
+        }
+        selected_model = st.selectbox("Choose AI Model", list(BASE_MODELS.keys()))
+        ACTIVE_MODEL = BASE_MODELS[selected_model]
+    else:
+        # Refiner models that use community compute
+        EDIT_MODELS = {
+            "🔄 Material Swap": "stabilityai/stable-diffusion-xl-refiner-1.0",
+            "🎨 Pattern Fix (Canny)": "lllyasviel/sd-controlnet-canny",
+            "✍️ Text Command": "timbrooks/instruct-pix2pix"
+        }
+        selected_model = st.selectbox("Choose Refinement Engine", list(EDIT_MODELS.keys()))
+        ACTIVE_MODEL = EDIT_MODELS[selected_model]
+        uploaded_file = st.file_uploader("Upload Base Design", type=["png", "jpg", "jpeg"])
+        refinement_strength = st.slider("Refinement Strength", 0.1, 0.9, 0.5)
+
+# --------------------------------------
+# ⚙️ ENGINE (KEYWORD ARGUMENT FIX)
+# --------------------------------------
 def run_image_engine(prompt, base_image=None):
     try:
+        # Initialize client
         client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN)
+        
         if app_mode == "Pictator Refiner (Edit)" and base_image:
             img_byte_arr = io.BytesIO()
             base_image = base_image.convert("RGB")
-            base_image.save(img_byte_arr, format='JPEG', quality=95)
+            base_image.save(img_byte_arr, format='JPEG')
+            
+            # CRITICAL FIX: Named arguments to prevent 'multiple values' TypeError
             return client.image_to_image(
-                prompt, 
+                prompt=prompt, 
                 image=img_byte_arr.getvalue(), 
-                strength=refinement_strength,
-                guidance_scale=7.5
+                strength=refinement_strength
             )
         else:
-            return client.text_to_image(prompt, width=1024, height=768)
+            # TEXT-TO-IMAGE: Standard named prompt call
+            return client.text_to_image(prompt=prompt, width=1024, height=768)
+            
     except Exception as e:
+        if "402" in str(e):
+            st.error("💳 CEO Alert: Hugging Face credits exhausted for this token.")
         st.sidebar.error(f"Engine Detail: {e}")
         return None
 
