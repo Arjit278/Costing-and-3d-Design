@@ -57,11 +57,12 @@ if not st.session_state.authenticated:
 # --------------------------------------
 with st.sidebar:
     st.divider()
+    # KEY FIX: Added unique key to prevent DuplicateElementId error
     app_mode = st.radio("🚀 Select Suite Mode", ["Pictator Pro (Base)", "Pictator Refiner (Edit)"], key="mode_sel_final")
     
     if app_mode == "Pictator Pro (Base)":
         BASE_MODELS = {
-            "⚡ SDXL Turbo (High Speed)": "stabilityai/sdxl-turbo",
+            "⚡ SDXL Turbo (High Stability)": "stabilityai/sdxl-turbo",
             "✨ SDXL Base 1.0": "stabilityai/stable-diffusion-xl-base-1.0",
             "🎨 Realistic Vision V6": "SG161222/Realistic_Vision_V6.0_B1_noVAE"
         }
@@ -76,27 +77,24 @@ with st.sidebar:
         }
         selected_model = st.selectbox("Choose Refinement Engine", list(EDIT_MODELS.keys()))
         ACTIVE_MODEL = EDIT_MODELS[selected_model]
-        uploaded_file = st.file_uploader("Upload Base Design", type=["png", "jpg", "jpeg"])
+        uploaded_file = st.file_uploader("Upload Base Design", type=["png", "jpg", "jpeg"], key="refiner_upload")
         refinement_strength = st.slider("Refinement Strength", 0.1, 0.9, 0.5)
 
 # --------------------------------------
-# ⚡ FLASHMIND ENGINE (Your Working Fallback)
+# ⚡ FLASHMIND ENGINE (OpenRouter Fallback)
 # --------------------------------------
 ANALYSIS_FALLBACK_MODELS = [
     "qwen/qwen-3-coder:free",
-    "qwen/qwen3-next-80b-a3b-instruct",
     "meta-llama/llama-3.2-3b-instruct:free",
     "nousresearch/hermes-2-pro-llama-3-8b",
 ]
-
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     for model in ANALYSIS_FALLBACK_MODELS:
         try:
             r = requests.post(
-                OPENROUTER_URL,
+                "https://openrouter.ai/api/v1/chat/completions",
                 headers=headers,
                 json={
                     "model": model,
@@ -106,56 +104,40 @@ def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
                     ],
                     "temperature": 0.2
                 },
-                timeout=60
+                timeout=30
             )
             if r.status_code == 200:
-                data = r.json()
-                content = data.get("choices", [{}])[0].get("message", {}).get("content")
-                if content:
-                    return content.strip(), "OK"
-            elif r.status_code == 429:
-                time.sleep(2)
-        except:
-            continue
+                content = r.json().get("choices", [{}])[0].get("message", {}).get("content")
+                if content: return content.strip(), "OK"
+        except: continue
     return None, "All models failed"
 
-def safe_json_extract(text):
-    try:
-        text = str(text)
-        return json.loads(text)
-    except:
-        pass
-    try:
-        match = re.search(r"\[\s*{.*?}\s*\]", text, re.DOTALL)
-        if match:
-            return json.loads(match.group())
-    except:
-        pass
-    return []
-
 # --------------------------------------
-# ⚙️ IMAGE ENGINES
+# ⚙️ IMAGE ENGINE (Keyword Argument Fix)
 # --------------------------------------
 def run_image_engine(prompt, base_image=None):
     try:
-        headers = {"x-use-cache": "false"}
+        # Headers to bypass caching and wait for community hardware
+        headers = {"x-use-cache": "false", "x-wait-for-model": "true"}
         client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN, headers=headers)
+        
         if app_mode == "Pictator Refiner (Edit)" and base_image:
             img_byte_arr = io.BytesIO()
             base_image = base_image.convert("RGB")
-            base_image.save(img_byte_arr, format='JPEG')
+            base_image.save(img_byte_arr, format='JPEG', quality=90)
+            # KEY FIX: Explicitly name arguments prompt= and image=
             return client.image_to_image(prompt=prompt, image=img_byte_arr.getvalue(), strength=refinement_strength)
         else:
             return client.text_to_image(prompt=prompt, width=1024, height=768)
     except Exception as e:
         if "402" in str(e):
-            st.error("💳 CEO Error: Provider Credit Exhausted. Switching to 'SDXL Turbo' is recommended.")
+            st.error("💳 CEO Error: Provider Credit Exhausted. Switch to SDXL Turbo or rotate token.")
         st.sidebar.error(f"Engine Detail: {e}")
         return None
 
 def fetch_market_references(query):
     try:
-        params = {"engine": "google_images", "q": f"{query} luxury car seat cover", "api_key": SERP_API_KEY, "num": 40}
+        params = {"engine": "google_images", "q": f"{query} luxury seat cover", "api_key": SERP_API_KEY, "num": 40}
         r = requests.get("https://serpapi.com/search", params=params, timeout=10)
         results = r.json().get("images_results", [])
         filtered, used = [], set()
@@ -181,18 +163,14 @@ with st.expander("🧠 Smart Design Configurator (2026 Specs)", expanded=True):
         colors = st.text_input("Colorway", value="Tan & Charcoal")
     with colC:
         lighting = st.selectbox("Lighting", ["Studio", "Blueprint", "Cinematic Showroom"])
-        market = st.selectbox("Market Tier", ["Luxury", "Affordable", "Sports", "OEM Upgrade"])
+        market = st.selectbox("Market Tier", ["Luxury", "Affordable", "OEM Upgrade"])
     custom_instruction = st.text_area("✍️ Engineering Instructions", placeholder="Add blue contrast stitching details...")
 
 # --------------------------------------
 # 🚀 EXECUTION PIPELINE
 # --------------------------------------
 if st.button("🚀 EXECUTE ENGINEERING SUITE", key="exec_btn_master"):
-    final_prompt = (
-        f"Professional automotive interior photography, {car} custom seat covers, "
-        f"{pattern} pattern, premium {material}, {colors} theme, "
-        f"{custom_instruction}, {lighting} lighting, 8k ultra-realistic."
-    )
+    final_prompt = f"Professional automotive interior, {car} custom seat covers, {pattern} {material}, {colors}, {custom_instruction}, 8k realistic."
     
     with st.status("Processing Virtual Prototype...") as status:
         main_img = None
@@ -201,22 +179,14 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE", key="exec_btn_master"):
                 input_img = Image.open(uploaded_file)
                 main_img = run_image_engine(final_prompt, input_img)
             else:
-                st.error("⚠️ Please upload an image to use Refiner."); st.stop()
+                st.error("⚠️ Please upload an image for Refiner."); st.stop()
         else:
             main_img = run_image_engine(final_prompt)
             
-        st.write("🌐 Verifying Unique Market Links...")
         market_refs = fetch_market_references(f"{car} {material} seat cover")
-        
-        st.write("📊 Finalizing RCA Analysis...")
-        # CALLING YOUR CUSTOM OPENROUTER FUNCTION
-        analysis, status_code = call_openrouter_with_fallback_requests(
-            f"Briefly analyze durability and 2026 trends for {material} with {pattern} stitching.",
-            OPENROUTER_API_KEY
-        )
+        analysis, _ = call_openrouter_with_fallback_requests(f"Durability analysis: {material} {pattern}", OPENROUTER_API_KEY)
         status.update(label="✅ Engineering Complete", state="complete")
 
-    # Display Results
     col_left, col_right = st.columns([2, 1])
     with col_left:
         st.subheader(f"🖼️ {app_mode} Output")
@@ -229,10 +199,7 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE", key="exec_btn_master"):
 
     with col_right:
         st.subheader("📈 Flashmind Analysis")
-        if analysis:
-            st.info(analysis)
-        else:
-            st.warning("Intelligence Engine timed out. Manual review required.")
+        st.info(analysis if analysis else "Intelligence Engine Timeout.")
 
     st.divider()
     st.subheader("🌍 Verified Unique Market References")
