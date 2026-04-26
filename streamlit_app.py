@@ -57,7 +57,6 @@ if not st.session_state.authenticated:
 # --------------------------------------
 with st.sidebar:
     st.divider()
-    # KEY FIX: Added unique key to prevent DuplicateElementId error
     app_mode = st.radio("🚀 Select Suite Mode", ["Pictator Pro (Base)", "Pictator Refiner (Edit)"], key="mode_sel_final")
     
     if app_mode == "Pictator Pro (Base)":
@@ -71,8 +70,8 @@ with st.sidebar:
         uploaded_file = None 
     else:
         EDIT_MODELS = {
-            "🔄 SDXL Refiner": "stabilityai/stable-diffusion-xl-refiner-1.0",
-            "✍️ Text Command Edit": "timbrooks/instruct-pix2pix",
+            "🔄 Qwen Refiner": "prithivMLmods/Qwen-Image-Edit-2511-LoRAs-Fast",
+            "✍️ Qwen Edit": "InstantX/Qwen-Image-ControlNet-Inpainting",
             "🎨 Pattern Fix": "lllyasviel/sd-controlnet-canny"
         }
         selected_model = st.selectbox("Choose Refinement Engine", list(EDIT_MODELS.keys()))
@@ -89,12 +88,14 @@ ANALYSIS_FALLBACK_MODELS = [
     "nousresearch/hermes-2-pro-llama-3-8b",
 ]
 
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
 def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     for model in ANALYSIS_FALLBACK_MODELS:
         try:
             r = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_URL,
                 headers=headers,
                 json={
                     "model": model,
@@ -113,11 +114,10 @@ def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
     return None, "All models failed"
 
 # --------------------------------------
-# ⚙️ IMAGE ENGINE (Keyword Argument Fix)
+# ⚙️ IMAGE ENGINE (Updated for Qwen/Inpainting)
 # --------------------------------------
 def run_image_engine(prompt, base_image=None):
     try:
-        # Headers to bypass caching and wait for community hardware
         headers = {"x-use-cache": "false", "x-wait-for-model": "true"}
         client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN, headers=headers)
         
@@ -125,8 +125,21 @@ def run_image_engine(prompt, base_image=None):
             img_byte_arr = io.BytesIO()
             base_image = base_image.convert("RGB")
             base_image.save(img_byte_arr, format='JPEG', quality=90)
-            # KEY FIX: Explicitly name arguments prompt= and image=
-            return client.image_to_image(prompt=prompt, image=img_byte_arr.getvalue(), strength=refinement_strength)
+            
+            # Handling Qwen-style Inpainting vs Standard Img2Img
+            if "Inpainting" in ACTIVE_MODEL:
+                return client.image_to_image(
+                    prompt=prompt, 
+                    image=img_byte_arr.getvalue(), 
+                    strength=refinement_strength,
+                    tool="inpainting"
+                )
+            else:
+                return client.image_to_image(
+                    prompt=prompt, 
+                    image=img_byte_arr.getvalue(), 
+                    strength=refinement_strength
+                )
         else:
             return client.text_to_image(prompt=prompt, width=1024, height=768)
     except Exception as e:
@@ -163,28 +176,27 @@ with st.expander("🧠 Smart Design Configurator (2026 Specs)", expanded=True):
         colors = st.text_input("Colorway", value="Tan & Charcoal")
     with colC:
         lighting = st.selectbox("Lighting", ["Studio", "Blueprint", "Cinematic Showroom"])
-        market = st.selectbox("Market Tier", ["Luxury", "Affordable", "OEM Upgrade"])
+        market = st.selectbox("Market Tier", ["Luxury", "Affordable", "Sports", "OEM Upgrade"])
     custom_instruction = st.text_area("✍️ Engineering Instructions", placeholder="Add blue contrast stitching details...")
 
 # --------------------------------------
 # 🚀 EXECUTION PIPELINE
 # --------------------------------------
 if st.button("🚀 EXECUTE ENGINEERING SUITE", key="exec_btn_master"):
-    final_prompt = f"Professional automotive interior, {car} custom seat covers, {pattern} {material}, {colors}, {custom_instruction}, 8k realistic."
+    final_prompt = f"Professional automotive interior photography, {car} seat covers, {pattern} pattern, {material}, {colors} theme, {custom_instruction}, 8k ultra-realistic."
     
     with st.status("Processing Virtual Prototype...") as status:
         main_img = None
         if app_mode == "Pictator Refiner (Edit)":
             if uploaded_file:
-                input_img = Image.open(uploaded_file)
-                main_img = run_image_engine(final_prompt, input_img)
+                main_img = run_image_engine(final_prompt, Image.open(uploaded_file))
             else:
-                st.error("⚠️ Please upload an image for Refiner."); st.stop()
+                st.error("⚠️ Upload an image to use Refiner."); st.stop()
         else:
             main_img = run_image_engine(final_prompt)
             
         market_refs = fetch_market_references(f"{car} {material} seat cover")
-        analysis, _ = call_openrouter_with_fallback_requests(f"Durability analysis: {material} {pattern}", OPENROUTER_API_KEY)
+        analysis, _ = call_openrouter_with_fallback_requests(f"Briefly analyze durability and 2026 trends for {material} with {pattern} stitching.", OPENROUTER_API_KEY)
         status.update(label="✅ Engineering Complete", state="complete")
 
     col_left, col_right = st.columns([2, 1])
