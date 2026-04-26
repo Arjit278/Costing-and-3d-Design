@@ -91,7 +91,7 @@ def call_openrouter(prompt):
             json={
                 "model": "qwen/qwen-3-coder:free",
                 "messages": [{"role": "user", "content": prompt}]
-            }, timeout=10
+            }, timeout=15
         )
         return r.json()["choices"][0]["message"]["content"].strip()
     except:
@@ -103,6 +103,7 @@ def run_image_engine(prompt, base_image=None):
         if base_image and app_mode == "Pictator Refiner (Edit)":
             img_byte_arr = io.BytesIO()
             base_image.save(img_byte_arr, format='PNG')
+            # Specialized Image-to-Image call
             return client.image_to_image(prompt, image=img_byte_arr.getvalue(), strength=refinement_strength)
         else:
             return client.text_to_image(prompt, width=1024, height=768)
@@ -112,16 +113,29 @@ def run_image_engine(prompt, base_image=None):
 
 def fetch_market_references(query):
     try:
-        params = {"engine": "google_images", "q": f"{query} luxury seat cover", "api_key": SERP_API_KEY, "num": 30}
+        params = {"engine": "google_images", "q": f"{query} luxury car seat cover", "api_key": SERP_API_KEY, "num": 40}
         r = requests.get("https://serpapi.com/search", params=params, timeout=10)
         results = r.json().get("images_results", [])
-        filtered, used = [], set()
+        filtered, used_sources = [], set()
+        
+        # Step 1: Filter unique trusted domains
         for i in results:
-            src = i.get("source", "").strip()
-            if src not in used and any(td in i.get("link", "").lower() for td in TRUSTED_DOMAINS):
-                filtered.append({"img": i["original"], "link": i["link"], "src": src})
-                used.add(src)
+            src_name = i.get("source", "").strip()
+            link = i.get("link", "").lower()
+            if src_name in used_sources: continue
+            if any(td in link for td in TRUSTED_DOMAINS):
+                filtered.append({"img": i["original"], "link": i.get("link"), "src": src_name})
+                used_sources.add(src_name)
             if len(filtered) >= 6: break
+        
+        # Step 2: Fallback to unique sources if < 6
+        if len(filtered) < 6:
+            for i in results:
+                src_name = i.get("source", "").strip()
+                if src_name not in used_sources and "link" in i:
+                    filtered.append({"img": i["original"], "link": i.get("link"), "src": src_name})
+                    used_sources.add(src_name)
+                if len(filtered) >= 6: break
         return filtered
     except: return []
 
@@ -140,26 +154,39 @@ with st.expander("🧠 Smart Design Configurator (2026 Specs)", expanded=True):
         lighting = st.selectbox("Lighting", ["Studio", "Blueprint", "Cinematic Showroom"])
         market = st.selectbox("Market Tier", ["Luxury", "Affordable", "Sports", "OEM Upgrade"])
     
-    custom_instruction = st.text_area("✍️ Engineering Instructions", placeholder="e.g. Add blue contrast stitching...")
+    custom_instruction = st.text_area("✍️ Engineering Instructions", placeholder="e.g. Add blue contrast stitching or specific perforation details...")
 
 # --------------------------------------
 # 🚀 EXECUTION
 # --------------------------------------
 if st.button("🚀 EXECUTE ENGINEERING SUITE"):
-    final_prompt = f"Professional automotive interior, {car} custom seat covers, {pattern} {material}, {colors}, {custom_instruction}, 8k ultra-realistic."
+    final_prompt = (
+        f"Professional automotive interior photography, {car} custom seat covers, "
+        f"{pattern} pattern, premium {material}, {colors} theme, "
+        f"{custom_instruction}, {lighting} lighting, 8k ultra-realistic, material macro detail."
+    )
     
     with st.status("Processing Virtual Prototype...") as status:
-        st.write(f"🎨 Activating {app_mode}...")
-        base_img = Image.open(uploaded_file) if app_mode == "Pictator Refiner (Edit)" and uploaded_file else None
+        st.write(f"🎨 Activating {app_mode} Engine...")
+        # Check for image if in Refiner mode
+        base_img = None
+        if app_mode == "Pictator Refiner (Edit)":
+            if uploaded_file:
+                base_img = Image.open(uploaded_file)
+            else:
+                st.error("⚠️ Please upload an image to use the Refiner mode.")
+                st.stop()
+        
         main_img = run_image_engine(final_prompt, base_img)
         
         st.write("🌐 Verifying Unique Market Links...")
-        market_refs = fetch_market_references(f"{car} {material}")
+        market_refs = fetch_market_references(f"{car} {material} seat cover")
         
         st.write("📊 Finalizing RCA Analysis...")
-        analysis = call_openrouter(f"Report for {material} with {pattern} stitching.")
+        analysis = call_openrouter(f"Briefly analyze durability and 2026 trends for {material} with {pattern} stitching.")
         status.update(label="✅ Task Complete", state="complete")
 
+    # --- DISPLAY RESULTS ---
     col_left, col_right = st.columns([2, 1])
     with col_left:
         st.subheader(f"🖼️ {app_mode} Output")
@@ -167,7 +194,7 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE"):
             st.image(main_img, use_container_width=True)
             buf = io.BytesIO()
             main_img.save(buf, format="PNG")
-            st.download_button("💾 Save Prototype", buf.getvalue(), "pictator_2026.png")
+            st.download_button("💾 Save Prototype", buf.getvalue(), f"pictator_{int(time.time())}.png")
 
     with col_right:
         st.subheader("📈 Flashmind Analysis")
@@ -181,9 +208,11 @@ if st.button("🚀 EXECUTE ENGINEERING SUITE"):
             with m_cols[idx % 3]:
                 st.image(ref["img"], use_container_width=True)
                 st.link_button(f"🔗 View on {ref['src']}", ref["link"])
+    else:
+        st.warning("No unique market references found for this configuration.")
 
 # --------------------------------------
-# 🏁 THE CEO FOOTER (FIXED)
+# 🏁 THE CEO FOOTER
 # --------------------------------------
 st.markdown("""
 <style>
@@ -204,4 +233,4 @@ st.markdown("""
 <div class="footer">
     <b>Pictator Pro 2026</b> | Dual-Mode Engineering Engine | Zero Data Retention Protocol | © 2026 Harmony Engineering
 </div>
-""", unsafe_allow_html=True) # Changed from unsafe_content_allowed
+""", unsafe_allow_html=True)
