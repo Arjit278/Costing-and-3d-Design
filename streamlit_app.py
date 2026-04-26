@@ -50,9 +50,11 @@ if not st.session_state.authenticated:
 # ⚡ FLASHMIND ENGINE (OPENROUTER)
 # --------------------------------------
 ANALYSIS_MODELS = [
-    "qwen/qwen-3-coder:free",
+    "qwen/qwen3-coder:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
     "meta-llama/llama-3.2-3b-instruct:free",
     "nousresearch/hermes-2-pro-llama-3-8b",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
 ]
 
 def call_openrouter(prompt):
@@ -116,7 +118,7 @@ with st.expander("🧠 Smart Design Configurator (2026 Specs)", expanded=True):
         pattern = st.selectbox("Stitching", ["Ultra-Quilt Diamond", "Hex-Cell", "Puff", "Minimalist Flat", "Anydesign"])
     with colB:
         material = st.selectbox("Material", ["1200 GSM Nappa", "Cotton", "Synthetic leather",  "Carbon Fiber Leather", "Anydesign"])
-        colors = st.text_input("Colorway", "Dual", "Tan & Charcoal", "Anydesign")
+        colors = st.text_input("Colorway", "Dual", "Tan & Charcoal")
     with colC:
         lighting = st.selectbox("Lighting", ["Studio", "Blueprint", "Cinematic Showroom", "Anyother"])
         market = st.selectbox("Market Tier", ["Luxury", "Affordeable", "Sports", "OEM Upgrade"])
