@@ -112,14 +112,14 @@ selected_model = st.sidebar.selectbox("Choose AI Model", list(MODEL_OPTIONS.keys
 with st.expander("🧠 Smart Design Configurator (2026 Specs)", expanded=True):
     colA, colB, colC = st.columns(3)
     with colA:
-        car = st.selectbox("Vehicle", ["Maruti Wagon R", "Maruti Grand Vitara"])
-        pattern = st.selectbox("Stitching", ["Ultra-Quilt Diamond", "Hex-Cell", "Minimalist Flat"])
+        car = st.selectbox("Vehicle", ["Maruti Wagon R", "Maruti Grand Vitara", "Any Car mention in prompt"])
+        pattern = st.selectbox("Stitching", ["Ultra-Quilt Diamond", "Hex-Cell", "Puff", "Minimalist Flat", "Anydesign"])
     with colB:
-        material = st.selectbox("Material", ["1200 GSM Nappa", "Carbon Fiber Leather"])
-        colors = st.text_input("Colorway", "Tan & Charcoal")
+        material = st.selectbox("Material", ["1200 GSM Nappa", "Cotton", "Synthetic leather",  "Carbon Fiber Leather", "Anydesign"])
+        colors = st.text_input("Colorway", "Dual", "Tan & Charcoal", "Anydesign")
     with colC:
-        lighting = st.selectbox("Lighting", ["Studio", "Cinematic Showroom"])
-        market = st.selectbox("Market Tier", ["Luxury", "OEM Upgrade"])
+        lighting = st.selectbox("Lighting", ["Studio", "Blueprint", "Cinematic Showroom", "Anyother"])
+        market = st.selectbox("Market Tier", ["Luxury", "Affordeable", "Sports", "OEM Upgrade"])
     
     custom_instruction = st.text_area("✍️ Custom Engineering Instructions", placeholder="Add specific details...")
 
