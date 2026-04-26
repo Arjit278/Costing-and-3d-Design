@@ -84,8 +84,8 @@ with st.sidebar:
     else:
         EDIT_MODELS = {
             "🔄 SDXL Refiner": "stabilityai/stable-diffusion-xl-refiner-1.0",
-            "✍️ Text Command Edit": "timbrooks/instruct-pix2pix",
-            "🎨 Structural Fix": "lllyasviel/sd-controlnet-canny"
+            "✍️ Text Qwen Edit": "prithivMLmods/Qwen-Image-Edit-2511-LoRAs-Fast",
+            "🎨 Structural paint Fix": "InstantX/Qwen-Image-ControlNet-Inpainting"
         }
         selected_model = st.selectbox("Choose Refinement Engine", list(EDIT_MODELS.keys()))
         ACTIVE_MODEL = EDIT_MODELS[selected_model]
