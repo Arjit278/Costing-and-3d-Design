@@ -83,9 +83,7 @@ with st.sidebar:
 # --------------------------------------
 # ⚙️ ENGINES
 # --------------------------------------
- --------------------------------------
-# ⚡ FLASHMIND ENGINE (OPENROUTER)
-# --------------------------------------
+
 ANALYSIS_MODELS = [
     "qwen/qwen-3-coder:free",
     "meta-llama/llama-3.2-3b-instruct:free",
