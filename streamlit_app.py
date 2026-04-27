@@ -131,28 +131,49 @@ def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
 # ⚙️ IMAGE CORE ENGINES (REFINER OPTIMIZED)
 # --------------------------------------
 def run_image_engine(prompt, base_image=None):
+    # Endpoint for the specific Qwen-Image-Edit engine
+    REFINER_URL = "https://router.huggingface.co/fal-ai/fal-ai/qwen-image-edit-2511/lora?_subdomain=queue"
+    
     try:
-        # Mandatory CEO Headers for GPU Stability & Wake-up Protocol
+        # Global headers for GPU Stability
         headers = {
+            "Authorization": f"Bearer {HF_TOKEN}",
             "x-use-cache": "false", 
             "x-wait-for-model": "true"
         }
-        client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN, headers=headers)
-        
+
+        # --- REFINER MODE (Editing) ---
         if app_mode == "Pictator Refiner (Editing)" and base_image:
-            # 1. Process Image for Refinement (RGB Conversion for PNG/HEIC compatibility)
+            # 1. Process Image: Convert to RGB and Encode for the Router API
             img_byte_arr = io.BytesIO()
-            base_image.convert("RGB").save(img_byte_arr, format='JPEG', quality=85)
-            
-            # 2. FIXED API CALL: Using Explicit Named Arguments
-            # This is the ONLY way to prevent the "Multiple values for image" error
-            return client.image_to_image(
-                prompt=prompt, 
-                image=img_byte_arr.getvalue(), 
-                strength=refinement_strength
+            base_image.convert("RGB").save(img_byte_arr, format='JPEG', quality=95)
+            encoded_image = base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
+
+            payload = {
+                "inputs": encoded_image,
+                "parameters": {
+                    "prompt": prompt,
+                    "strength": refinement_strength # Inherited from your global slider
+                }
+            }
+
+            # 2. Direct Request Call with 60s Timeout for HF/Streamlit GPU reliability
+            response = requests.post(
+                REFINER_URL, 
+                headers=headers, 
+                json=payload, 
+                timeout=60
             )
+            
+            if response.status_code == 200:
+                return Image.open(io.BytesIO(response.content))
+            else:
+                raise Exception(f"Refiner Error {response.status_code}: {response.text}")
+
+        # --- PRO MODE (Text-to-Image) ---
         else:
-            # 3. Standard Text-to-Image for Pro Mode
+            # Re-initializing client here to keep your Pro version exactly as it was
+            client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN, headers=headers)
             return client.text_to_image(
                 prompt=prompt, 
                 width=1024, 
@@ -166,6 +187,8 @@ def run_image_engine(prompt, base_image=None):
             st.sidebar.error("💳 CEO Alert: Provider Credit Exhausted. Switch to SDXL Turbo.")
         elif "404" in error_msg:
             st.sidebar.error(f"⚠️ Model Endpoint Offline: {ACTIVE_MODEL}")
+        elif "timeout" in error_msg.lower():
+            st.sidebar.error("⌛ CEO Alert: Request Timed Out (60s limit). Try again.")
         else:
             st.sidebar.error(f"Inference Log: {error_msg}")
         return None
