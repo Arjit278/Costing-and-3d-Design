@@ -128,21 +128,46 @@ def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
     return None, "System Failure"
 
 # --------------------------------------
-# ⚙️ IMAGE CORE ENGINES
+# ⚙️ IMAGE CORE ENGINES (REFINER OPTIMIZED)
 # --------------------------------------
 def run_image_engine(prompt, base_image=None):
     try:
-        headers = {"x-use-cache": "false", "x-wait-for-model": "true"}
+        # Mandatory CEO Headers for GPU Stability & Wake-up Protocol
+        headers = {
+            "x-use-cache": "false", 
+            "x-wait-for-model": "true"
+        }
         client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN, headers=headers)
         
         if app_mode == "Pictator Refiner (Editing)" and base_image:
+            # 1. Process Image for Refinement (RGB Conversion for PNG/HEIC compatibility)
             img_byte_arr = io.BytesIO()
             base_image.convert("RGB").save(img_byte_arr, format='JPEG', quality=85)
-            return client.image_to_image(prompt=prompt, image=img_byte_arr.getvalue(), strength=refinement_strength)
+            
+            # 2. FIXED API CALL: Using Explicit Named Arguments
+            # This is the ONLY way to prevent the "Multiple values for image" error
+            return client.image_to_image(
+                prompt=prompt, 
+                image=img_byte_arr.getvalue(), 
+                strength=refinement_strength
+            )
         else:
-            return client.text_to_image(prompt=prompt, width=1024, height=768)
+            # 3. Standard Text-to-Image for Pro Mode
+            return client.text_to_image(
+                prompt=prompt, 
+                width=1024, 
+                height=768
+            )
+            
     except Exception as e:
-        st.sidebar.error(f"Inference Log: {e}")
+        # Integrated CEO Error Trap
+        error_msg = str(e)
+        if "402" in error_msg:
+            st.sidebar.error("💳 CEO Alert: Provider Credit Exhausted. Switch to SDXL Turbo.")
+        elif "404" in error_msg:
+            st.sidebar.error(f"⚠️ Model Endpoint Offline: {ACTIVE_MODEL}")
+        else:
+            st.sidebar.error(f"Inference Log: {error_msg}")
         return None
 
 def fetch_market_references(query):
