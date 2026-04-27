@@ -84,7 +84,7 @@ with st.sidebar:
     else:
         EDIT_MODELS = {
             "🔄 SDXL Refiner": "stabilityai/stable-diffusion-xl-refiner-1.0",
-            "✍️ Text Qwen Edit": "prithivMLmods/Qwen-Image-Edit-2511-LoRAs-Fast",
+            "✍️ Text Qwen Edit": "Qwen/Qwen-Image-Edit-2511",
             "🎨 Structural paint Fix": "InstantX/Qwen-Image-ControlNet-Inpainting"
         }
         selected_model = st.selectbox("Choose Refinement Engine", list(EDIT_MODELS.keys()))
