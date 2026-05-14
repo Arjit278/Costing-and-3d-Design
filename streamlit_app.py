@@ -18,7 +18,7 @@ SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
 TRUSTED_DOMAINS = [
-    "autofurnish.com", "autofit.in", "autotextile.com", "cncstitching.com",
+    "autofurnish.com","za.pinterest.com/ideas/leather-car-seat-covers", "autofit.in", "autotextile.com", "cncstitching.com",
     "seatcoversunlimited.com", "foamvilla.com", "sa.made-in-china.com",
     "autoclint.com", "autoform.in", "coverking.com", "katzkin.com",
     "amazon.in", "cardekho.com", "elegantautoretail.com", "carwale.com"
