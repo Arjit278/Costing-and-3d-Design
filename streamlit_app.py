@@ -7,6 +7,12 @@ import re
 import numpy as np
 from PIL import Image
 from huggingface_hub import InferenceClient
+import torch
+
+from diffusers import (
+    StableDiffusionImg2ImgPipeline,
+    AutoPipelineForImage2Image
+)
 
 # --------------------------------------
 # 🔧 PAGE CONFIG & API
@@ -69,54 +75,118 @@ def refine_image_advanced(image_bytes, prompt, model_choice):
 
     try:
 
-        client = InferenceClient(
-            token=HF_TOKEN,
-            timeout=120
-        )
+        import io
+        import torch
+
+        from PIL import Image
+
+        from huggingface_hub import login
+
+        from diffusers import AutoPipelineForImage2Image
 
         # =====================================================
-        # ONLY HF API SAFE MODELS
+        # HF LOGIN
+        # =====================================================
+
+        login(token=HF_TOKEN)
+
+        # =====================================================
+        # IMAGE PREP
+        # =====================================================
+
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+        image = image.resize((768, 768))
+
+        # =====================================================
+        # DEVICE
+        # =====================================================
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        dtype = torch.float16 if device == "cuda" else torch.float32
+
+        # =====================================================
+        # MODEL MAP
         # =====================================================
 
         MODEL_MAP = {
 
-            "FLUX Schnell":
-                "black-forest-labs/FLUX.1-schnell",
+            "Realistic Vision":
+                "SG161222/Realistic_Vision_V5.1_noVAE",
 
-            "FLUX Dev":
-                "black-forest-labs/FLUX.1-dev",
+            "DreamShaper":
+                "Lykon/DreamShaper",
+
+            "OpenJourney":
+                "prompthero/openjourney",
+
+            "Juggernaut XL":
+                "RunDiffusion/Juggernaut-XL-v9",
 
             "SDXL Turbo":
                 "stabilityai/sdxl-turbo",
 
-            "SD 3.5":
-                "stabilityai/stable-diffusion-3.5-large",
-
-            "Kandinsky":
-                "kandinsky-community/kandinsky-2-2-decoder"
+            "SDXL Base":
+                "stabilityai/stable-diffusion-xl-base-1.0"
         }
 
         model_id = MODEL_MAP.get(model_choice)
 
         if not model_id:
-            st.error("Invalid model selection")
+
+            st.error("Invalid model selected")
+
             return None
 
         # =====================================================
-        # IMAGE TO IMAGE
+        # LOAD MODEL
         # =====================================================
 
-        result = client.image_to_image(
-            image=image_bytes,
-            prompt=prompt,
-            model=model_id
-        )
+        with st.spinner(f"Loading {model_choice} model..."):
+
+            pipe = AutoPipelineForImage2Image.from_pretrained(
+                model_id,
+                torch_dtype=dtype,
+                use_safetensors=True,
+                token=HF_TOKEN
+            )
+
+        # =====================================================
+        # PERFORMANCE OPTIMIZATION
+        # =====================================================
+
+        pipe = pipe.to(device)
+
+        if device == "cuda":
+
+            pipe.enable_attention_slicing()
+
+            pipe.enable_vae_slicing()
+
+        # =====================================================
+        # GENERATION
+        # =====================================================
+
+        with st.spinner("Generating refined image..."):
+
+            result = pipe(
+                prompt=prompt,
+                image=image,
+                strength=0.6,
+                guidance_scale=7.5,
+                num_inference_steps=25
+            ).images[0]
 
         return result
 
     except Exception as e:
 
-        st.error(str(e))
+        import traceback
+
+        st.error(f"Refiner Pipeline ({model_choice}) Error")
+
+        st.code(traceback.format_exc())
 
         return None
 
@@ -164,13 +234,15 @@ uploaded_file = st.sidebar.file_uploader("Upload Image to Edit", type=["png", "j
 active_engine = st.sidebar.selectbox(
     "🖌️ Refiner Engine",
     [
-        "FLUX Schnell",
-        "FLUX Dev",
+        "Realistic Vision",
+        "DreamShaper",
+        "OpenJourney",
+        "Juggernaut XL",
         "SDXL Turbo",
-        "SD 3.5",
-        "Kandinsky"
+        "SDXL Base"
     ]
 )
+
 # --------------------------------------
 # 🎨 UI LOGIC: REFINER vs PRO MODE
 # --------------------------------------
