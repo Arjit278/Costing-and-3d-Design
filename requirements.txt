@@ -1,11 +1,12 @@
 streamlit
 requests
 Pillow
-huggingface-hub
 numpy
 opencv-python
 pandas
 torch
+torchvision
+torchaudio
 diffusers
 transformers
 accelerate
@@ -13,3 +14,5 @@ safetensors
 sentencepiece
 scipy
 ftfy
+huggingface-hub
+xformers
