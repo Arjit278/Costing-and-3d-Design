@@ -66,106 +66,57 @@ def generate_ai_image(prompt, model_id):
         return None
 
 def refine_image_advanced(image_bytes, prompt, model_choice):
-    """
-    MASTER REFINER ENGINE
-    Multi-Model Advanced Img2Img / Inpaint Routing
-    """
 
     try:
 
         client = InferenceClient(
             token=HF_TOKEN,
-            timeout=60
+            timeout=120
         )
 
         # =====================================================
-        # ALIMAMA / FLUX UNO
+        # ONLY HF API SAFE MODELS
         # =====================================================
-        if model_choice == "Alimama/UNO":
 
-            return client.image_to_image(
-                image=image_bytes,
-                prompt=prompt,
-                model="alimama-creative/FLUX.1-dev-Controlnet-Inpainting-Beta",
-                strength=0.5,
-                guidance_scale=7.5
-            )
+        MODEL_MAP = {
 
-       
-        # =====================================================
-        # KANDINSKY
-        # =====================================================
-        elif model_choice == "Kandinsky 2.2":
+            "FLUX Schnell":
+                "black-forest-labs/FLUX.1-schnell",
 
-            return client.image_to_image(
-                image=image_bytes,
-                prompt=prompt,
-                model="kandinsky-community/kandinsky-2-2-decoder",
-                strength=0.45,
-                guidance_scale=7.0
-            )
+            "FLUX Dev":
+                "black-forest-labs/FLUX.1-dev",
 
-        # =====================================================
-        # SDXL REFINER
-        # =====================================================
-        elif model_choice == "SDXL Refiner":
+            "SDXL Turbo":
+                "stabilityai/sdxl-turbo",
 
-            return client.image_to_image(
-                image=image_bytes,
-                prompt=prompt,
-                model="stabilityai/stable-diffusion-xl-refiner-1.0",
-                strength=0.45,
-                guidance_scale=7.5
-            )
+            "SD 3.5":
+                "stabilityai/stable-diffusion-3.5-large",
 
-        # =====================================================
-        # REALISTIC VISION
-        # =====================================================
-        elif model_choice == "Realistic Vision":
+            "Kandinsky":
+                "kandinsky-community/kandinsky-2-2-decoder"
+        }
 
-            return client.image_to_image(
-                image=image_bytes,
-                prompt=prompt,
-                model="SG161222/Realistic_Vision_V5.1_noVAE",
-                strength=0.55,
-                guidance_scale=7.5
-            )
+        model_id = MODEL_MAP.get(model_choice)
 
-        # =====================================================
-        # DREAMSHAPER
-        # =====================================================
-        elif model_choice == "DreamShaper":
-
-            return client.image_to_image(
-                image=image_bytes,
-                prompt=prompt,
-                model="Lykon/DreamShaper",
-                strength=0.6,
-                guidance_scale=7.5
-            )
-
-        # =====================================================
-        # OPENJOURNEY
-        # =====================================================
-        elif model_choice == "OpenJourney":
-
-            return client.image_to_image(
-                image=image_bytes,
-                prompt=prompt,
-                model="prompthero/openjourney",
-                strength=0.65,
-                guidance_scale=8.0
-            )
-
-        
-
-        else:
-            st.error(f"Unsupported model selected: {model_choice}")
+        if not model_id:
+            st.error("Invalid model selection")
             return None
+
+        # =====================================================
+        # IMAGE TO IMAGE
+        # =====================================================
+
+        result = client.image_to_image(
+            image=image_bytes,
+            prompt=prompt,
+            model=model_id
+        )
+
+        return result
 
     except Exception as e:
 
-        st.error(f"Refiner Pipeline ({model_choice}) Error: {e}")
+        st.error(str(e))
 
         return None
 
