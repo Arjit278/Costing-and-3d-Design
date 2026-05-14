@@ -67,28 +67,129 @@ def generate_ai_image(prompt, model_id):
 
 def refine_image_advanced(image_bytes, prompt, model_choice):
     """
-    REFINER: Advanced Image-to-Image / Inpaint Protocol.
-    Implements Alimama/UNO or ControlNet Inpaint with 40s timeout.
+    MASTER REFINER ENGINE
+    Multi-Model Advanced Img2Img / Inpaint Routing
     """
+
     try:
-        # Toggle logic between specialized refiner backends
-        model_id = (
-            "alimama-creative/FLUX.1-dev-Controlnet-Inpainting-Beta" 
-            if model_choice == "Alimama/UNO" 
-            else "lllyasviel/control_v11p_sd15_inpaint"
+
+        client = InferenceClient(
+            token=HF_TOKEN,
+            timeout=60
         )
-        
-        client = InferenceClient(model=model_id, token=HF_TOKEN, timeout=40)
-        
-        # Professional-grade design refinement
-        return client.image_to_image(
-            image_bytes, 
-            prompt=prompt, 
-            strength=0.5, 
-            guidance_scale=7.5
-        )
+
+        # =====================================================
+        # ALIMAMA / FLUX UNO
+        # =====================================================
+        if model_choice == "Alimama/UNO":
+
+            return client.image_to_image(
+                image=image_bytes,
+                prompt=prompt,
+                model="alimama-creative/FLUX.1-dev-Controlnet-Inpainting-Beta",
+                strength=0.5,
+                guidance_scale=7.5
+            )
+
+        # =====================================================
+        # CONTROLNET INPAINT
+        # =====================================================
+        elif model_choice == "ControlNet Inpaint":
+
+            return client.image_to_image(
+                image=image_bytes,
+                prompt=prompt,
+                model="lllyasviel/control_v11p_sd15_inpaint",
+                strength=0.6,
+                guidance_scale=8.0
+            )
+
+        # =====================================================
+        # KANDINSKY
+        # =====================================================
+        elif model_choice == "Kandinsky 2.2":
+
+            return client.image_to_image(
+                image=image_bytes,
+                prompt=prompt,
+                model="kandinsky-community/kandinsky-2-2-decoder",
+                strength=0.45,
+                guidance_scale=7.0
+            )
+
+        # =====================================================
+        # SDXL REFINER
+        # =====================================================
+        elif model_choice == "SDXL Refiner":
+
+            return client.image_to_image(
+                image=image_bytes,
+                prompt=prompt,
+                model="stabilityai/stable-diffusion-xl-refiner-1.0",
+                strength=0.45,
+                guidance_scale=7.5
+            )
+
+        # =====================================================
+        # REALISTIC VISION
+        # =====================================================
+        elif model_choice == "Realistic Vision":
+
+            return client.image_to_image(
+                image=image_bytes,
+                prompt=prompt,
+                model="SG161222/Realistic_Vision_V5.1_noVAE",
+                strength=0.55,
+                guidance_scale=7.5
+            )
+
+        # =====================================================
+        # DREAMSHAPER
+        # =====================================================
+        elif model_choice == "DreamShaper":
+
+            return client.image_to_image(
+                image=image_bytes,
+                prompt=prompt,
+                model="Lykon/DreamShaper",
+                strength=0.6,
+                guidance_scale=7.5
+            )
+
+        # =====================================================
+        # OPENJOURNEY
+        # =====================================================
+        elif model_choice == "OpenJourney":
+
+            return client.image_to_image(
+                image=image_bytes,
+                prompt=prompt,
+                model="prompthero/openjourney",
+                strength=0.65,
+                guidance_scale=8.0
+            )
+
+        # =====================================================
+        # JUGGERNAUT XL
+        # =====================================================
+        elif model_choice == "Juggernaut XL":
+
+            return client.image_to_image(
+                image=image_bytes,
+                prompt=prompt,
+                model="RunDiffusion/Juggernaut-XL-v9",
+                strength=0.5,
+                guidance_scale=7.0
+            )
+
+        else:
+            st.error(f"Unsupported model selected: {model_choice}")
+            return None
+
     except Exception as e:
+
         st.error(f"Refiner Pipeline ({model_choice}) Error: {e}")
+
         return None
 
 def call_openrouter(prompt):
@@ -131,8 +232,20 @@ selected_model = st.sidebar.selectbox("Choose Pro AI Model", list(MODEL_OPTIONS.
 st.sidebar.markdown("---")
 st.sidebar.subheader("🖌️ Pictator Refiner Mode")
 uploaded_file = st.sidebar.file_uploader("Upload Image to Edit", type=["png", "jpg", "jpeg"])
-refiner_engine_toggle = st.sidebar.toggle("Engine: Alimama/UNO", value=True, help="ON: Alimama/UNO | OFF: ControlNet Inpaint")
-active_engine = "Alimama/UNO" if refiner_engine_toggle else "ControlNet Inpaint"
+
+active_engine = st.sidebar.selectbox(
+    "🖌️ Refiner Engine",
+    [
+        "Alimama/UNO",
+        "ControlNet Inpaint",
+        "Kandinsky 2.2",
+        "SDXL Refiner",
+        "Realistic Vision",
+        "DreamShaper",
+        "OpenJourney",
+        "Juggernaut XL"
+    ]
+)
 
 # --------------------------------------
 # 🎨 UI LOGIC: REFINER vs PRO MODE
