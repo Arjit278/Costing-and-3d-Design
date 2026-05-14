@@ -164,11 +164,11 @@ uploaded_file = st.sidebar.file_uploader("Upload Image to Edit", type=["png", "j
 active_engine = st.sidebar.selectbox(
     "🖌️ Refiner Engine",
     [
-        "Alimama/UNO",
-        "Kandinsky 2.2",
-        "Realistic Vision",
-        "DreamShaper",
-        "OpenJourney"
+        "FLUX Schnell",
+        "FLUX Dev",
+        "SDXL Turbo",
+        "SD 3.5",
+        "Kandinsky"
     ]
 )
 # --------------------------------------
