@@ -91,19 +91,7 @@ def refine_image_advanced(image_bytes, prompt, model_choice):
                 guidance_scale=7.5
             )
 
-        # =====================================================
-        # CONTROLNET INPAINT
-        # =====================================================
-        elif model_choice == "ControlNet Inpaint":
-
-            return client.image_to_image(
-                image=image_bytes,
-                prompt=prompt,
-                model="lllyasviel/control_v11p_sd15_inpaint",
-                strength=0.6,
-                guidance_scale=8.0
-            )
-
+       
         # =====================================================
         # KANDINSKY
         # =====================================================
@@ -169,18 +157,7 @@ def refine_image_advanced(image_bytes, prompt, model_choice):
                 guidance_scale=8.0
             )
 
-        # =====================================================
-        # JUGGERNAUT XL
-        # =====================================================
-        elif model_choice == "Juggernaut XL":
-
-            return client.image_to_image(
-                image=image_bytes,
-                prompt=prompt,
-                model="RunDiffusion/Juggernaut-XL-v9",
-                strength=0.5,
-                guidance_scale=7.0
-            )
+        
 
         else:
             st.error(f"Unsupported model selected: {model_choice}")
@@ -237,16 +214,12 @@ active_engine = st.sidebar.selectbox(
     "🖌️ Refiner Engine",
     [
         "Alimama/UNO",
-        "ControlNet Inpaint",
         "Kandinsky 2.2",
-        "SDXL Refiner",
         "Realistic Vision",
         "DreamShaper",
-        "OpenJourney",
-        "Juggernaut XL"
+        "OpenJourney"
     ]
 )
-
 # --------------------------------------
 # 🎨 UI LOGIC: REFINER vs PRO MODE
 # --------------------------------------
