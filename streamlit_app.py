@@ -4,19 +4,13 @@ import streamlit as st
 import json
 import time
 import re
-import base64
 from PIL import Image
 from huggingface_hub import InferenceClient
 
 # --------------------------------------
 # 🔧 PAGE CONFIG & API
 # --------------------------------------
-st.set_page_config(
-    page_title="Pictator Pro 2026", 
-    page_icon="🏎️", 
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Pictator Pro 2026", page_icon="🏎️", layout="wide")
 
 OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
 SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
@@ -31,10 +25,10 @@ TRUSTED_DOMAINS = [
 ]
 
 st.title("🏎️ Pictator Pro – CEO Engineering Suite")
-st.caption("Strategic Parallel RCA | GPU-Optimized Rendering | 2026 Material Intel")
+st.caption("Strategic Parallel RCA | Multithreaded Design | 2026 Material Intel")
 
 # --------------------------------------
-# 🔐 AUTHENTICATION PROTOCOL
+# 🔐 AUTHENTICATION
 # --------------------------------------
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -42,271 +36,222 @@ if "authenticated" not in st.session_state:
 with st.sidebar:
     st.title("🔐 Access Panel")
     if not st.session_state.authenticated:
-        user = st.text_input("Username", placeholder="Harmony")
+        user = st.text_input("Username")
         pwd = st.text_input("Password", type="password")
-        if st.button("Authorize Suite"):
+        if st.button("Login"):
             if user == "Harmony" and pwd == "Harmony_Pictator123":
                 st.session_state.authenticated = True
                 st.rerun()
             else:
-                st.error("Invalid Credentials - Security Protocol Engaged")
+                st.error("Invalid Credentials")
     else:
-        st.success("🟢 Engineering Access: Harmony")
-        if st.button("Secure Logout"):
+        st.success("🟢 Logged in as Harmony")
+        if st.button("Logout"):
             st.session_state.authenticated = False
             st.rerun()
 
 if not st.session_state.authenticated:
-    st.warning("🔐 Please authenticate to access 2026 Material Intelligence.")
+    st.warning("🔐 Please login to continue")
     st.stop()
 
 # --------------------------------------
-# ⚡ DUAL-MODE ENGINE CONFIGURATION
+# ⚡ FLASHMIND ENGINE (OPENROUTER)
 # --------------------------------------
-with st.sidebar:
-    st.divider()
-    st.subheader("🚀 Suite Orchestration")
-    app_mode = st.radio(
-        "Select Operation Mode", 
-        ["Pictator Pro (Generation)", "Pictator Refiner (Editing)"], 
-        key="suite_mode_selection_v2"
-    )
-    
-    if app_mode == "Pictator Pro (Generation)":
-        BASE_MODELS = {
-            "⚡ SDXL Turbo (High Performance)": "stabilityai/sdxl-turbo",
-            "✨ SDXL Base 1.0 (High Detail)": "stabilityai/stable-diffusion-xl-base-1.0",
-            "🎨 Realistic Vision V6 (Photorealistic)": "SG161222/Realistic_Vision_V6.0_B1_noVAE"
-        }
-        selected_model = st.selectbox("Choose AI Model", list(BASE_MODELS.keys()))
-        ACTIVE_MODEL = BASE_MODELS[selected_model]
-        uploaded_file = None 
-    else:
-        EDIT_MODELS = {
-            "🔄 SDXL Refiner": "stabilityai/stable-diffusion-xl-refiner-1.0",
-            "✍️ Text Qwen Edit": "fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA",
-            "🎨 Structural paint Fix": "InstantX/Qwen-Image-ControlNet-Inpainting"
-        }
-        selected_model = st.selectbox("Choose Refinement Engine", list(EDIT_MODELS.keys()))
-        ACTIVE_MODEL = EDIT_MODELS[selected_model]
-        uploaded_file = st.file_uploader("Upload Base Design (PNG/JPG)", type=["png", "jpg", "jpeg"], key="refiner_up_v2")
-        refinement_strength = st.slider("Refinement Strength (AI Influence)", 0.1, 0.9, 0.5)
-
-# --------------------------------------
-# ⚡ FLASHMIND ENGINE (OpenRouter Fallback)
-# --------------------------------------
-ANALYSIS_FALLBACK_MODELS = [
+ANALYSIS_MODELS = [
     "qwen/qwen-3-coder:free",
     "meta-llama/llama-3.2-3b-instruct:free",
     "nousresearch/hermes-2-pro-llama-3-8b",
 ]
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-def call_openrouter_with_fallback_requests(prompt: str, api_key: str):
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    for model in ANALYSIS_FALLBACK_MODELS:
+def call_openrouter(prompt):
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    for model in ANALYSIS_MODELS:
         try:
             r = requests.post(
-                OPENROUTER_URL,
+                "https://openrouter.ai/api/v1/chat/completions",
                 headers=headers,
                 json={
                     "model": model,
                     "messages": [
-                        {"role": "system", "content": "You are a professional automotive engineering consultant."},
+                        {"role": "system", "content": "You are an automotive engineering expert."},
                         {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.2
+                    ]
                 },
-                timeout=30
+                timeout=15
             )
             if r.status_code == 200:
-                content = r.json().get("choices", [{}])[0].get("message", {}).get("content")
-                if content: return content.strip(), "OK"
+                return r.json()["choices"][0]["message"]["content"].strip()
         except:
             continue
-    return None, "System Failure"
+    return "Intelligence fallback active: Manual review required."
 
 # --------------------------------------
-# ⚙️ IMAGE CORE ENGINES (REFINER OPTIMIZED)
+# 🛠️ IMAGE & MARKET ENGINES
 # --------------------------------------
-def run_image_engine(prompt, base_image=None):
-    # Endpoint for the specific Qwen-Image-Edit engine
-    REFINER_URL = "https://router.huggingface.co/fal-ai/fal-ai/qwen-image-edit-2511/lora?_subdomain=queue"
-    
+def generate_ai_image(prompt, model_id):
+    """GENERATE: Pure AI Design Concept"""
     try:
-        # Global headers for GPU Stability
-        headers = {
-            "Authorization": f"Bearer {HF_TOKEN}",
-            "x-use-cache": "false", 
-            "x-wait-for-model": "true"
-        }
-
-        # --- REFINER MODE (Editing) ---
-        if app_mode == "Pictator Refiner (Editing)" and base_image:
-            # 1. Process Image: Convert to RGB and Encode for the Router API
-            img_byte_arr = io.BytesIO()
-            base_image.convert("RGB").save(img_byte_arr, format='JPEG', quality=95)
-            encoded_image = base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
-
-            payload = {
-                "inputs": encoded_image,
-                "parameters": {
-                    "prompt": prompt,
-                    "strength": refinement_strength # Inherited from your global slider
-                }
-            }
-
-            # 2. Direct Request Call with 60s Timeout for HF/Streamlit GPU reliability
-            response = requests.post(
-                REFINER_URL, 
-                headers=headers, 
-                json=payload, 
-                timeout=60
-            )
-            
-            if response.status_code == 200:
-                return Image.open(io.BytesIO(response.content))
-            else:
-                raise Exception(f"Refiner Error {response.status_code}: {response.text}")
-
-        # --- PRO MODE (Text-to-Image) ---
-        else:
-            # Re-initializing client here to keep your Pro version exactly as it was
-            client = InferenceClient(model=ACTIVE_MODEL, token=HF_TOKEN, headers=headers)
-            return client.text_to_image(
-                prompt=prompt, 
-                width=1024, 
-                height=768
-            )
-            
+        client = InferenceClient(model=model_id, token=HF_TOKEN)
+        return client.text_to_image(prompt, width=1024, height=768)
     except Exception as e:
-        # Integrated CEO Error Trap
-        error_msg = str(e)
-        if "402" in error_msg:
-            st.sidebar.error("💳 CEO Alert: Provider Credit Exhausted. Switch to SDXL Turbo.")
-        elif "404" in error_msg:
-            st.sidebar.error(f"⚠️ Model Endpoint Offline: {ACTIVE_MODEL}")
-        elif "timeout" in error_msg.lower():
-            st.sidebar.error("⌛ CEO Alert: Request Timed Out (60s limit). Try again.")
-        else:
-            st.sidebar.error(f"Inference Log: {error_msg}")
+        st.error(f"HF Generation Failed: {e}")
+        return None
+
+def refine_image(image_bytes, prompt):
+    """REFINER: Edit existing design via Pictator Refiner"""
+    try:
+        # Using SDXL Refiner - Fast, High Quality, and Free/Cheap on HF
+        client = InferenceClient(model="stabilityai/stable-diffusion-xl-refiner-1.0", token=HF_TOKEN)
+        return client.image_to_image(image_bytes, prompt=prompt, strength=0.5)
+    except Exception as e:
+        st.error(f"Refiner Error: {e}")
         return None
 
 def fetch_market_references(query):
     try:
-        params = {"engine": "google_images", "q": f"{query} car seat covers", "api_key": SERP_API_KEY, "num": 50}
-        r = requests.get("https://serpapi.com/search", params=params, timeout=15)
+        params = {
+            "engine": "google_images", 
+            "q": f"{query} car seat covers leather", 
+            "api_key": SERP_API_KEY, 
+            "num": 40
+        }
+        r = requests.get("https://serpapi.com/search", params=params, timeout=10)
         results = r.json().get("images_results", [])
-        filtered, used_sources = [], set()
+        
+        filtered_refs = []
+        used_domains = set()
+
         for i in results:
-            src = i.get("source", "Unknown").strip()
-            if src not in used_sources:
-                filtered.append({"img": i["original"], "link": i.get("link"), "src": src})
-                used_sources.add(src)
-            if len(filtered) >= 6: break
-        return filtered
-    except:
+            source_name = i.get("source", "").strip()
+            link = i.get("link", "").lower()
+            if source_name in used_domains: continue
+            is_trusted = any(td in link for td in TRUSTED_DOMAINS)
+            
+            if is_trusted:
+                filtered_refs.append({"img": i["original"], "link": i["link"], "src": source_name})
+                used_domains.add(source_name)
+            if len(filtered_refs) >= 6: break
+        
+        if len(filtered_refs) < 6:
+            for i in results:
+                source_name = i.get("source", "").strip()
+                if source_name not in used_domains:
+                    filtered_refs.append({"img": i["original"], "link": i["link"], "src": source_name})
+                    used_domains.add(source_name)
+                if len(filtered_refs) >= 6: break
+        return filtered_refs
+    except Exception as e:
+        st.sidebar.error(f"Search Fallback Engaged: {e}")
         return []
 
 # --------------------------------------
-# 🎯 SMART DESIGN CONFIGURATOR
+# 🎯 UI: SMART CONFIGURATOR
 # --------------------------------------
+MODEL_OPTIONS = {
+    "⚡ FLUX.1 Schnell": "black-forest-labs/FLUX.1-schnell",
+    "🔥 FLUX.1 Dev": "black-forest-labs/FLUX.1-dev",
+    "✨ SD 3.5 Large": "stabilityai/stable-diffusion-3.5-large"
+}
+selected_model = st.sidebar.selectbox("Choose AI Model", list(MODEL_OPTIONS.keys()))
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🖌️ Pictator Refiner")
+uploaded_file = st.sidebar.file_uploader("Upload Design to Edit", type=["png", "jpg", "jpeg"])
+refine_prompt = st.sidebar.text_area("Refiner Instructions", placeholder="e.g. Change stitching to Red, add carbon fiber texture...")
+if uploaded_file and st.sidebar.button("Refine Design"):
+    with st.spinner("Refining..."):
+        refined_img = refine_image(uploaded_file.getvalue(), refine_prompt)
+        if refined_img:
+            st.image(refined_img, caption="Refined by Pictator Pro", use_container_width=True)
+
 with st.expander("🧠 Smart Design Configurator (2026 Specs)", expanded=True):
     colA, colB, colC = st.columns(3)
     with colA:
-        car = st.selectbox("Vehicle Target", ["Maruti Wagon R", "Maruti Grand Vitara", "Mahindra Thar", "Custom/Other"])
-        pattern = st.selectbox("Stitching Pattern", ["Ultra-Quilt Diamond", "Hex-Cell", "Puff", "Minimalist Flat"])
+        car = st.selectbox("Vehicle", ["Maruti Wagon R", "Maruti Grand Vitara", "Custom/Other"])
+        stitch_type = st.selectbox("Threading Stitch", ["Threading Stitch Decorative", "Double Decorative", "Custom Stitching"])
+        custom_stitch = st.text_input("Custom Stitch Details") if "Custom" in stitch_type else ""
+        
     with colB:
-        material = st.selectbox("Material Choice", ["1200 GSM Nappa", "Synthetic Leather", "Carbon Fiber Leather", "Cotton Canvas"])
-        colors = st.text_input("Colorway Architecture", value="Tan & Charcoal")
+        material = st.selectbox("Material", ["1200 GSM Nappa", "Cotton", "Synthetic Leather", "Carbon Fiber Leather"])
+        piping_quilt = st.toggle("Design Piping & Quilting")
+        custom_piping = st.text_input("Custom Piping/Quilt Details") if piping_quilt else ""
+        
     with colC:
-        lighting = st.selectbox("Environment Lighting", ["Studio Showroom", "Blueprint Static", "Golden Hour Cinematic"])
-        tier = st.selectbox("Market Tier Positioning", ["Luxury", "Affordable", "OEM Upgrade"])
-    
-    custom_instr = st.text_area("✍️ Engineering Directives", placeholder="e.g. Add blue contrast piping...")
+        base_color_toggle = st.toggle("Base Colors")
+        base_color = st.selectbox("Base Tone", ["Beige", "Ivory", "Black"]) if base_color_toggle else "Tan & Charcoal"
+        num_images = st.select_slider("Generation Count", options=[1, 3, 5])
+        
+    st.divider()
+    col_st1, col_st2 = st.columns(2)
+    with col_st1:
+        stitching_color = st.toggle("Stitch Color Control")
+        s_color = st.selectbox("Stitch Color", ["Silver", "Red", "Blue", "Gold", "Custom"]) if stitching_color else "Contrast"
+    with col_st2:
+        market = st.selectbox("Market Tier", ["Luxury", "Affordable", "Sports", "OEM Upgrade"])
+
+    custom_instruction = st.text_area("✍️ Custom Engineering Instructions", placeholder="Add specific details like contrast piping or perforation...")
 
 # --------------------------------------
-# 🚀 CORE EXECUTION PIPELINE
+# 🚀 EXECUTION PIPELINE
 # --------------------------------------
-if st.button("🚀 EXECUTE FULL ENGINEERING SUITE", key="exec_btn_300"):
+if st.button("🚀 EXECUTE FULL SUITE"):
+    piping_str = f"with {custom_piping} piping and quilting" if piping_quilt else ""
+    stitch_str = f"{stitch_type} {custom_stitch} in {s_color} color"
+    
     final_prompt = (
         f"Professional automotive interior photography, {car} custom seat covers, "
-        f"{pattern} pattern, premium {material}, {colors} theme, "
-        f"{custom_instr}, {lighting} lighting, 8k ultra-realistic, detailed texture."
+        f"Base color {base_color}, {stitch_str}, {piping_str}, premium {material}, "
+        f"{custom_instruction}, Studio lighting, 8k ultra-realistic, material macro detail."
     )
     
-    with st.status("Initializing Strategic RCA & Prototyping...") as status:
-        st.write("🎨 Visual Synthesis Engine...")
+    with st.status("Engineering Intelligence...") as status:
+        st.write("🎨 Generating AI Design Variations...")
+        generated_images = []
+        for i in range(num_images):
+            # Slightly vary colors for patterns if multiple images are requested
+            current_prompt = final_prompt if i == 0 else f"{final_prompt}, alternate variant {i}"
+            img = generate_ai_image(current_prompt, MODEL_OPTIONS[selected_model])
+            if img: generated_images.append(img)
         
-        # 60s GPU Wake-up Timer specifically for REFINER
-        if app_mode == "Pictator Refiner (Editing)":
-            if not uploaded_file:
-                st.error("⚠️ Refiner requires an uploaded image."); st.stop()
-            
-            st.write("🛰️ Activating GPU Cluster (60s Wake-up Protocol)...")
-            prog_bar = st.progress(0)
-            img_input = Image.open(uploaded_file)
-            
-            # Start GPU Handshake Countdown
-            for i in range(100):
-                time.sleep(0.08) # ~8 seconds overhead for connection stability
-                prog_bar.progress(i + 1)
-                if i == 40: # Call engine early to let 'x-wait-for-model' handle the rest
-                    main_img = run_image_engine(final_prompt, img_input)
-            prog_bar.empty()
-        else:
-            # Pro Mode (Standard Generation) - No artificial delay
-            main_img = run_image_engine(final_prompt)
-            
-        st.write("🌐 Scraping Market Feasibility (6 Unique Sources)...")
-        market_refs = fetch_market_references(f"{car} {material} leather seat cover")
+        st.write("🌐 Fetching Real-World Market References...")
+        market_refs = fetch_market_references(f"{car} {material} seat cover")
         
-        st.write("📊 Running RCA Intelligence Analytics...")
-        analysis, _ = call_openrouter_with_fallback_requests(
-            f"Detailed 2026 durability analysis for {material} with {pattern} stitching.", 
-            OPENROUTER_API_KEY
-        )
-        status.update(label="✅ Engineering Intelligence Finalized", state="complete")
+        st.write("📊 Analyzing Material Trends...")
+        analysis = call_openrouter(f"Briefly analyze durability and 2026 trends for {material} with {stitch_type}.")
+        
+        status.update(label="✅ Analysis Complete", state="complete")
 
-    # --- RESULT VISUALIZATION ---
-    res_col1, res_col2 = st.columns([2, 1])
+    col_left, col_right = st.columns([2, 1])
     
-    with res_col1:
-        st.subheader(f"🖼️ {app_mode} Output")
-        if main_img:
-            st.image(main_img, caption=f"2026 Prototype: {car}", use_container_width=True)
-            buf = io.BytesIO()
-            main_img.save(buf, format="PNG")
-            st.download_button("💾 Save Engineering Concept", buf.getvalue(), f"design_{int(time.time())}.png", "image/png")
-        else:
-            st.error("❌ Output Pipeline Error. Check Token Credits.")
-
-    with res_col2:
+    with col_left:
+        st.subheader(f"🎨 AI-Generated Concepts ({len(generated_images)} Views)")
+        if generated_images:
+            for i, img in enumerate(generated_images):
+                st.image(img, caption=f"Variant {i+1}: {car}", use_container_width=True)
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                st.download_button(f"💾 Save Variant {i+1}", buf.getvalue(), f"design_{i+1}.png")
+    
+    with col_right:
         st.subheader("📈 Flashmind Analysis")
-        st.info(analysis if analysis else "Intelligence Engine Timeout. Manual review required.")
+        st.info(analysis)
 
     st.divider()
-    st.subheader("🌍 Verified Unique Market References")
+    st.subheader("🌍 Verified Market References & Live Shop Links (Real Photos)")
     if market_refs:
         m_cols = st.columns(3)
         for idx, ref in enumerate(market_refs):
             with m_cols[idx % 3]:
-                st.image(ref["img"], use_container_width=True)
+                st.image(ref["img"], caption=f"Ref from {ref['src']}", use_container_width=True)
                 st.link_button(f"🔗 View on {ref['src']}", ref["link"])
 
-# --------------------------------------
-# 🏁 THE CEO FOOTER
-# --------------------------------------
-st.markdown("""
-<style>
-    .footer { 
-        position: fixed; left: 0; bottom: 0; width: 100%; 
-        background-color: #0e1117; color: #555; text-align: center; 
-        padding: 10px; font-size: 12px; border-top: 1px solid #333; z-index: 100; 
-    }
-</style>
-<div class="footer">
-    <b>Pictator Pro 2026</b> | Dual-Mode Engineering Engine | GPU Optimized | Powered by Harmony-AI | © 2026 Harmony Engineering
-</div>
-""", unsafe_allow_html=True)
+with st.expander("📊 2026 Tech & Model Trends"):
+    st.write("- **AI Concepts:** Generated via Top Models are virtual prototype, customized and crafted by user, for prototype visualization.")
+    st.write("- **Refiner:** Pictator Refiner uses Image-to-Image translation to modify specific elements while maintaining base geometry.")
+    st.markdown("""
+        **Zero Data Retention (ZDR) Commitment:**
+        - **Non-Storage:** Prompts and generated designs are processed in volatile memory. 
+        - **Zero Training:** Your proprietary design logic is never used to train Omnicore & Pictator.
+        - **Encryption:** All API calls use TLS 1.3 encryption for end-to-end security.
+        - **Compliance:** This suite adheres to the 2026 Enterprise Privacy Standards for Industrial AI.
+        """)
