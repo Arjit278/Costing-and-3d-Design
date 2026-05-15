@@ -60,6 +60,38 @@ if not st.session_state.authenticated:
     st.warning("🔐 Please login to continue")
     st.stop()
 
+prompt = f"""
+Preserve exact OEM car seat structure and cabin layout.
+Do not change seat shape, dimensions, dashboard or perspective.
+
+Only modify:
+- seat leather material
+- stitching
+- quilting
+- piping
+- thread colors
+
+{material} leather,
+{stitch_type},
+{current_color} stitching,
+premium automotive photography,
+ultra realistic,
+OEM factory fitment,
+same original seat.
+"""
+
+negative_prompt = """
+different seat,
+new interior,
+changed geometry,
+distorted dashboard,
+extra seats,
+warped stitching,
+different car,
+SUV cabin,
+futuristic interior,
+concept car
+"""
 # --------------------------------------
 # ⚡ ENGINES (PRO & REFINER)
 # --------------------------------------
@@ -96,7 +128,7 @@ def refine_image_advanced(image_bytes, prompt, model_choice):
 
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-        image = image.resize((768, 768))
+        image = image.resize((704x512))
 
         # =====================================================
         # DEVICE
@@ -151,7 +183,8 @@ def refine_image_advanced(image_bytes, prompt, model_choice):
                 use_safetensors=True,
                 token=HF_TOKEN
             )
-
+        @st.cache_resource
+        def load_pipeline(): 
         # =====================================================
         # PERFORMANCE OPTIMIZATION
         # =====================================================
@@ -172,10 +205,11 @@ def refine_image_advanced(image_bytes, prompt, model_choice):
 
             result = pipe(
                 prompt=prompt,
+                negative_prompt=negative_prompt,
                 image=image,
-                strength=0.6,
-                guidance_scale=7.5,
-                num_inference_steps=25
+                strength=0.20,
+                guidance_scale=6,
+                num_inference_steps=18
             ).images[0]
 
         return result
@@ -229,7 +263,18 @@ selected_model = st.sidebar.selectbox("Choose Pro AI Model", list(MODEL_OPTIONS.
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🖌️ Pictator Refiner Mode")
-uploaded_file = st.sidebar.file_uploader("Upload Image to Edit", type=["png", "jpg", "jpeg"])
+
+WAGONR_IMAGE = "assets/wagonr.jpg"
+VITARA_IMAGE = "assets/vitara.png"
+
+BASE_IMAGES = {
+    "Maruti Wagon R": "assets/wagonr.jpg",
+    "Maruti Grand Vitara": "assets/vitara.png"
+}
+
+base_image = Image.open(
+    BASE_IMAGES[car]
+).convert("RGB")
 
 active_engine = st.sidebar.selectbox(
     "🖌️ Refiner Engine",
