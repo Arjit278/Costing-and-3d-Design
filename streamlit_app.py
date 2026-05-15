@@ -240,9 +240,6 @@ BASE_IMAGES = {
     "Maruti Grand Vitara": "assets/vitara.png"
 }
 
-base_image = Image.open(
-    BASE_IMAGES[car]
-).convert("RGB")
 
 active_engine = st.sidebar.selectbox(
     "🖌️ Refiner Engine",
@@ -317,6 +314,9 @@ else:
         with st.status("Engineering Intelligence...") as status:
             generated_images = []
             for i in range(num_images):
+                base_image = Image.open(
+                    BASE_IMAGES[car] 
+                ).convert("RGB")
                 current_color = manual_color if i == 0 else palette[i % len(palette)]
                 prompt = (f"Automotive interior, {car} seat covers, {material}, {base_color} base, "
                           f"{stitch_type} with {current_color} threading, "
