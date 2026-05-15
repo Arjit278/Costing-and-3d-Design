@@ -60,38 +60,6 @@ if not st.session_state.authenticated:
     st.warning("🔐 Please login to continue")
     st.stop()
 
-prompt = f"""
-Preserve exact OEM car seat structure and cabin layout.
-Do not change seat shape, dimensions, dashboard or perspective.
-
-Only modify:
-- seat leather material
-- stitching
-- quilting
-- piping
-- thread colors
-
-{material} leather,
-{stitch_type},
-{current_color} stitching,
-premium automotive photography,
-ultra realistic,
-OEM factory fitment,
-same original seat.
-"""
-
-negative_prompt = """
-different seat,
-new interior,
-changed geometry,
-distorted dashboard,
-extra seats,
-warped stitching,
-different car,
-SUV cabin,
-futuristic interior,
-concept car
-"""
 # --------------------------------------
 # ⚡ ENGINES (PRO & REFINER)
 # --------------------------------------
@@ -128,7 +96,7 @@ def refine_image_advanced(image_bytes, prompt, model_choice):
 
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-        image = image.resize((640x512))
+        image = image.resize((640, 512))
 
         # =====================================================
         # DEVICE
@@ -354,6 +322,45 @@ else:
                           f"{stitch_type} with {current_color} threading, "
                           f"{'Piping/Quilt: ' + custom_pq if piping_quilt else ''}, "
                           f"{custom_instruction}, studio lighting, 8k realism.")
+                negative_prompt = """
+                different seat,
+                new interior,
+                changed geometry,
+                distorted dashboard,
+                extra seats,
+                warped stitching,
+                different car,
+                SUV cabin,
+                futuristic interior,
+                concept car
+                """
+                
+                prompt = f"""
+                Preserve exact OEM car seat structure and cabin layout.
+                
+                Do not change:
+                - seat shape
+                - dashboard
+                - geometry
+                - perspective
+                
+                Only modify:
+                - leather material
+                - stitching
+                - quilting
+                - piping
+                - thread colors
+                
+                {material} leather,
+                {stitch_type},
+                {current_color} stitching,
+                {custom_instruction},
+                
+                premium automotive photography,
+                OEM factory fitment,
+                ultra realistic,
+                same original seat
+                """
                 
                 st.write(f"🎨 Generating {current_color} Variant...")
                 img = generate_ai_image(prompt, MODEL_OPTIONS[selected_model])
