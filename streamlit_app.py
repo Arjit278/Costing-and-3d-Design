@@ -94,8 +94,8 @@ def refine_image_advanced(image_bytes, prompt, model_choice):
         # IMAGE PREP
         # =====================================================
 
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-
+        
+        image = image.convert("RGB") 
         image = image.resize((640, 512))
 
         # =====================================================
@@ -333,7 +333,11 @@ else:
                 """
                 
                 st.write(f"🎨 Generating {current_color} Variant...")
-                img = generate_ai_image(prompt, MODEL_OPTIONS[selected_model])
+                img = refine_image_advanced(
+                    base_image,
+                    prompt,
+                    active_engine
+                )
                 if img: generated_images.append((img, current_color))
             
             market_refs = fetch_market_references(f"{car} {material} seat cover")
