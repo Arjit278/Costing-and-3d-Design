@@ -128,7 +128,7 @@ def refine_image_advanced(image_bytes, prompt, model_choice):
 
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-        image = image.resize((704x512))
+        image = image.resize((640x512))
 
         # =====================================================
         # DEVICE
