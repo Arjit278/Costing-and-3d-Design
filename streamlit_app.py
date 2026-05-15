@@ -143,28 +143,23 @@ def refine_image_advanced(image_bytes, prompt, model_choice):
         # LOAD MODEL
         # =====================================================
 
-        with st.spinner(f"Loading {model_choice} model..."):
-
+        @st.cache_resource
+        def load_pipeline(model_id, dtype, device):
+        
             pipe = AutoPipelineForImage2Image.from_pretrained(
                 model_id,
                 torch_dtype=dtype,
                 use_safetensors=True,
                 token=HF_TOKEN
             )
-        @st.cache_resource
-        def load_pipeline(): 
-        # =====================================================
-        # PERFORMANCE OPTIMIZATION
-        # =====================================================
-
-        pipe = pipe.to(device)
-
-        if device == "cuda":
-
-            pipe.enable_attention_slicing()
-
-            pipe.enable_vae_slicing()
-
+        
+            pipe = pipe.to(device)
+        
+            if device == "cuda":
+                pipe.enable_attention_slicing()
+                pipe.enable_vae_slicing()
+        
+            return pipe
         # =====================================================
         # GENERATION
         # =====================================================
@@ -253,31 +248,6 @@ active_engine = st.sidebar.selectbox(
     ]
 )
 
-# --------------------------------------
-# 🎨 UI LOGIC: REFINER vs PRO MODE
-# --------------------------------------
-if uploaded_file:
-    # --- REFINER WORKSPACE (HIDES PRO UI) ---
-    st.subheader(f"🖌️ Pictator Refiner Workspace ({active_engine})")
-    st.info(f"Refiner Active: Using {active_engine} protocol with 40s Rendering Timeout.")
-    
-    col_ref_img, col_ref_ctrl = st.columns([1, 1])
-    
-    with col_ref_img:
-        st.image(uploaded_file, caption="Original Design Plate", use_container_width=True)
-    
-    with col_ref_ctrl:
-        refine_prompt = st.text_area("✍️ Modification Instructions", placeholder="Describe design refinements (e.g., 'Replace beige leather with black carbon fiber')...", height=200)
-        if st.button("🚀 Apply Design Refinement"):
-            with st.spinner(f"Refining via {active_engine}..."):
-                refined_result = refine_image_advanced(uploaded_file.getvalue(), refine_prompt, active_engine)
-                if refined_result:
-                    st.image(refined_result, caption="Refined Output", use_container_width=True)
-                    buf = io.BytesIO(); refined_result.save(buf, format="PNG")
-                    st.download_button("💾 Save Refined Design", buf.getvalue(), "refined_design.png")
-    
-    if st.button("⬅️ Back to Pro Engineering Suite"):
-        st.rerun()
 
 else:
     # --- PRO VERSION INTERFACE ---
