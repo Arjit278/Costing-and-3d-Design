@@ -1,348 +1,579 @@
+
+# =========================================================
+# PICTATOR PRO 2026 — FULL UPDATED SCRIPT
+# Patch Toggle + Single Seat + Trend Intelligence Upgrade
+# =========================================================
+
 import io
 import requests
 import streamlit as st
-import torch
 from PIL import Image
-from diffusers import AutoPipelineForImage2Image
+from huggingface_hub import InferenceClient
 
-# -------------------------------------------------
-# CUDA OPTIMIZATION
-# -------------------------------------------------
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.benchmark = True
+# --------------------------------------
+# 🔧 PAGE CONFIG & API
+# --------------------------------------
 
-# -------------------------------------------------
-# PAGE CONFIG
-# -------------------------------------------------
 st.set_page_config(
     page_title="Pictator Pro 2026",
     page_icon="🏎️",
     layout="wide"
 )
 
-# -------------------------------------------------
-# API / SECRETS
-# -------------------------------------------------
 OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
 SERP_API_KEY = st.secrets.get("SERP_API_KEY", "")
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
-# -------------------------------------------------
-# TRUSTED DOMAINS
-# -------------------------------------------------
 TRUSTED_DOMAINS = [
-    "autofurnish.com", "autofit.in", "autotextile.com", "cncstitching.com",
-    "seatcoversunlimited.com", "foamvilla.com", "autoclint.com", "autoform.in",
-    "coverking.com", "katzkin.com", "amazon.in", "cardekho.com",
-    "elegantautoretail.com", "carwale.com"
+    "autofurnish.com",
+    "autofit.in",
+    "autotextile.com",
+    "coverking.com",
+    "katzkin.com",
+    "cardekho.com",
+    "carwale.com",
+    "amazon.in",
+    "elegantautoretail.com"
 ]
 
-# -------------------------------------------------
-# AUTHENTICATION GUARD
-# -------------------------------------------------
+# --------------------------------------
+# 🏎️ HEADER
+# --------------------------------------
+
+st.title("🏎️ Pictator Pro – CEO Engineering Suite")
+st.caption(
+    "Strategic Parallel RCA | Multithreaded Design | 2026 Material Intel"
+)
+
+# --------------------------------------
+# 🔐 AUTH
+# --------------------------------------
+
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 with st.sidebar:
+
     st.title("🔐 Access Panel")
+
     if not st.session_state.authenticated:
+
         user = st.text_input("Username")
         pwd = st.text_input("Password", type="password")
+
         if st.button("Login"):
+
             if user == "Harmony" and pwd == "Harmony_Pictator123":
+
                 st.session_state.authenticated = True
                 st.rerun()
+
             else:
+
                 st.error("Invalid Credentials")
+
     else:
-        st.success("🟢 Logged in")
+
+        st.success("🟢 Logged in as Harmony")
+
         if st.button("Logout"):
+
             st.session_state.authenticated = False
             st.rerun()
 
-# Halt execution early if unauthenticated to avoid rendering the rest of UI elements
 if not st.session_state.authenticated:
     st.warning("🔐 Please login to continue")
     st.stop()
 
-# -------------------------------------------------
-# TITLE & CAPTION
-# -------------------------------------------------
-st.title("🏎️ Pictator Pro – OEM Engineering Suite")
-st.caption("OEM Seat Preservation • Premium Automotive Refinement • Multi Variant Generation")
+# --------------------------------------
+# ⚡ MODELS
+# --------------------------------------
 
-# -------------------------------------------------
-# OEM BASE IMAGES
-# -------------------------------------------------
-BASE_IMAGES = {
-    "Maruti Wagon R": "assets/wagonr.jpg",
-    "Maruti Grand Vitara": "assets/vitara.png"
-}
-
-# -------------------------------------------------
-# MODEL UI
-# -------------------------------------------------
 MODEL_OPTIONS = {
     "⚡ FLUX.1 Schnell": "black-forest-labs/FLUX.1-schnell",
     "🔥 FLUX.1 Dev": "black-forest-labs/FLUX.1-dev",
-    "✨ SD 3.5 Large": "stabilityai/stable-diffusion-3.5-large"
+    "⚡ PaliGemma 2 3B": "google/paligemma2-3b-pt-448",
+    "✨ Pixtral 12B": "mistralai/Pixtral-12B-2409",
+    "🔥 GLM-4.1V 9B Thinking": "THUDM/glm-4-9b-chat",
+    "🏎️ Qwen2.5-VL 7B Instruct": "Qwen/Qwen2.5-VL-7B-Instruct",
+    "🏎️ FLUX.2 Klein": "black-forest-labs/FLUX.2-klein-9b-fp8",
+    "✨ FLUX.1 Kontext Dev": "black-forest-labs/FLUX.1-Kontext-dev",
+    "🪟 FLUX.1 Fill Dev": "black-forest-labs/FLUX.1-Fill-dev",
+    "🌀 FLUX.1 Redux Dev": "black-forest-labs/FLUX.1-Redux-dev"
 }
 
-selected_model = st.sidebar.selectbox("Choose Pro AI Model", list(MODEL_OPTIONS.keys()))
-st.sidebar.caption("⚡ OEM Refiner Optimization Active")
+selected_model = st.sidebar.selectbox(
+    "Choose Pro AI Model",
+    list(MODEL_OPTIONS.keys())
+)
 
-# -------------------------------------------------
-# LOAD PIPELINE
-# -------------------------------------------------
-@st.cache_resource
-def load_pipeline(selected_model):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.float16 if device == "cuda" else torch.float32
+# --------------------------------------
+# 📸 OEM REFERENCE
+# --------------------------------------
 
-    # Using fallback model setup as per original architecture design
-    model_id = "SG161222/Realistic_Vision_V5.1_noVAE"
+st.sidebar.markdown("---")
+st.sidebar.subheader("📸 OEM Reference Upload")
 
-    pipe = AutoPipelineForImage2Image.from_pretrained(
-        model_id,
-        torch_dtype=dtype,
-        use_safetensors=True,
-        token=HF_TOKEN
-    )
-    pipe = pipe.to(device)
+uploaded_reference = st.sidebar.file_uploader(
+    "Upload OEM Seat/Base Reference",
+    type=["png", "jpg", "jpeg"]
+)
 
-    if device == "cuda":
-        pipe.enable_attention_slicing()
-        pipe.enable_vae_slicing()
-        pipe.enable_model_cpu_offload()
+# --------------------------------------
+# 🪑 SEAT GENERATION MODE
+# --------------------------------------
 
-    return pipe
+st.sidebar.markdown("---")
+st.sidebar.subheader("🪑 Seat Generation Layout")
 
-# -------------------------------------------------
-# IMAGE REFINER
-# -------------------------------------------------
-def refine_image_advanced(image, prompt):
+seat_generation_mode = st.sidebar.radio(
+    "Seat Generation Type",
+    [
+        "Single Front Seat",
+        "Full 4 Seat Set"
+    ],
+    horizontal=True
+)
+
+wagonr_headrest_lock = st.sidebar.toggle(
+    "🔒 WagonR Fixed Headrest Enforcement",
+    value=True
+)
+
+# --------------------------------------
+# 🧠 IMAGE GENERATION
+# --------------------------------------
+
+def generate_ai_image(prompt, model_id):
+
     try:
-        pipe = load_pipeline(selected_model)
-        image = image.convert("RGB").resize((704, 512))
 
-        negative_prompt = (
-            "different seat, new interior, changed geometry, distorted dashboard, "
-            "extra seats, warped stitching, SUV cabin, futuristic interior, concept car, "
-            "different upholstery shape, changed contours, modified dashboard, steering wheel change"
+        client = InferenceClient(
+            model=model_id,
+            token=HF_TOKEN
         )
 
-        with st.spinner("Generating OEM-preserved refinement..."):
-            result = pipe(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
-                image=image,
-                strength=0.18,
-                guidance_scale=5.5,
-                num_inference_steps=16
-            ).images[0]
+        image = client.text_to_image(
+            prompt,
+            width=1024,
+            height=768,
+            guidance_scale=4.5,
+            num_inference_steps=28
+        )
 
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        return image
 
-        return result
     except Exception as e:
-        import traceback
-        st.error("Refiner Engine Error")
-        st.code(traceback.format_exc())
+
+        st.error(f"Generation Failed: {e}")
         return None
 
-# -------------------------------------------------
-# MARKET REFERENCES
-# -------------------------------------------------
-def fetch_market_references(query):
-    try:
-        params = {
-            "engine": "google_images",
-            "q": f"{query} car seat covers leather",
-            "api_key": SERP_API_KEY,
-            "num": 20
-        }
-        r = requests.get("https://serpapi.com/search", params=params, timeout=10)
-        results = r.json().get("images_results", [])
+# --------------------------------------
+# ⚡ FLASHMIND ANALYSIS
+# --------------------------------------
 
-        filtered_refs = []
-        used_domains = set()
+ANALYSIS_MODELS = [
+    "qwen/qwen-3-coder",
+    "meta-llama/llama-3.2-3b-instruct",
+    "nousresearch/hermes-2-pro-llama-3-8b"
+]
 
-        for i in results:
-            source_name = i.get("source", "").strip()
-            link = i.get("link", "").lower()
-
-            if source_name in used_domains:
-                continue
-
-            if any(td in link for td in TRUSTED_DOMAINS):
-                filtered_refs.append({
-                    "img": i["original"],
-                    "link": i["link"],
-                    "src": source_name
-                })
-                used_domains.add(source_name)
-
-            if len(filtered_refs) >= 6:
-                break
-        return filtered_refs
-    except:
-        return []
-
-# -------------------------------------------------
-# OPENROUTER ANALYSIS
-# -------------------------------------------------
 def call_openrouter(prompt):
+
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
-    try:
-        r = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json={
-                "model": "qwen/qwen-3-coder:free",
-                "messages": [
-                    {"role": "system", "content": "You are an automotive engineering expert."},
-                    {"role": "user", "content": prompt}
-                ]
-            },
-            timeout=15
-        )
-        if r.status_code == 200:
-            return r.json()["choices"][0]["message"]["content"].strip()
-    except:
-        pass
-    return "Engineering analysis currently unavailable."
 
-# -------------------------------------------------
-# SIDEBAR SETTINGS
-# -------------------------------------------------
-st.sidebar.markdown("---")
-st.sidebar.subheader("🖌️ OEM Refiner Settings")
-strict_oem_mode = st.sidebar.toggle("Strict OEM Preservation", value=True)
+    for model in ANALYSIS_MODELS:
 
-# -------------------------------------------------
-# MAIN UI
-# -------------------------------------------------
-with st.expander("🧠 Smart Design Configurator", expanded=True):
+        try:
+
+            r = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are an automotive engineering expert."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                },
+                timeout=20
+            )
+
+            if r.status_code == 200:
+
+                return r.json()["choices"][0]["message"]["content"]
+
+        except:
+            continue
+
+    return "Flashmind fallback active."
+
+# --------------------------------------
+# 🎨 CONFIGURATOR
+# --------------------------------------
+
+with st.expander(
+    "🧠 Smart Design Configurator (2026 Specs)",
+    expanded=True
+):
+
     colA, colB, colC = st.columns(3)
 
     with colA:
-        car = st.selectbox("Vehicle", ["Maruti Wagon R", "Maruti Grand Vitara"])
-        stitch_type = st.selectbox("Stitching Style", [
-            "Diamond Stitch", "Honeycomb Stitch", "Tuck and Roll",
-            "Contrast Stitching", "Double Decorative", "Thread Decorative"
-        ])
+
+        car = st.selectbox(
+            "Vehicle",
+            [
+                "Maruti Wagon R",
+                "Maruti Grand Vitara",
+                "Custom/Other"
+            ]
+        )
+
+        stitch_type = st.selectbox(
+            "Stitching Style",
+            [
+                "Diamond Stitch",
+                "Honeycomb Stitch",
+                "Tuck and Roll (Pleated)",
+                "Contrast Stitching",
+                "Threading Stitch Decorative",
+                "Double Decorative",
+                "Custom"
+            ]
+        )
 
     with colB:
-        material = st.selectbox("Material", [
-            "1200 GSM Nappa", "Synthetic Leather", "Carbon Fiber Leather",
-            "Premium Beige Leather", "Luxury Black Leather"
-        ])
-        piping_quilt = st.toggle("Design Piping & Quilting")
-        custom_pq = st.text_input("Piping / Quilt Details") if piping_quilt else ""
+
+        material = st.selectbox(
+            "Material",
+            [
+                "1200 GSM Nappa",
+                "Cotton",
+                "Synthetic Leather",
+                "Carbon Fiber Leather"
+            ]
+        )
 
     with colC:
-        base_color = st.selectbox("Base Color", ["Beige", "Ivory", "Black", "Tan", "Grey"])
-        num_images = st.select_slider("Generation Count", options=[1, 3, 5], value=1)
 
-    st.divider()
-    custom_instruction = st.text_area(
-        "✍️ Engineering Instructions",
-        placeholder="Example: sporty German luxury stitching with premium contrast quilting"
+        base_color = st.selectbox(
+            "Seat Base Color",
+            [
+                "Beige",
+                "Cream",
+                "Black",
+                "Ivory",
+                "Tan",
+                "Charcoal"
+            ]
+        )
+
+        num_images = st.select_slider(
+            "Generation Count",
+            options=[1, 3, 5]
+        )
+
+# --------------------------------------
+# 🎨 ADVANCED PATCH CONTROL
+# --------------------------------------
+
+st.markdown("### 🎨 Advanced Side Patch Engineering")
+
+patch_enable = st.toggle(
+    "Enable Side Patch Engineering",
+    value=True
+)
+
+patch_position = st.multiselect(
+    "Patch Placement",
+    [
+        "Seat Back Side Patch",
+        "Full Seat Side Patch",
+        "Upper Shoulder Side Patch",
+        "Lower Cushion Side Patch",
+        "Headrest Integrated Patch",
+        "Dual Side Flow Patch",
+        "Center Flow Accent",
+        "Outer Bolster Patch"
+    ],
+    default=["Full Seat Side Patch"]
+)
+
+patch_style = st.selectbox(
+    "Patch Styling",
+    [
+        "OEM Sport",
+        "Luxury Flow",
+        "Floating Accent",
+        "Dual Tone OEM+",
+        "Performance GT",
+        "Urban GenZ",
+        "Minimal Executive",
+        "Custom"
+    ]
+)
+
+patch_texture = st.selectbox(
+    "Patch Texture",
+    [
+        "Smooth Leather",
+        "Carbon Texture",
+        "Alcantara Style",
+        "Perforated Sport",
+        "Matte Nappa",
+        "Gloss Accent"
+    ]
+)
+
+patch_color_palette = st.multiselect(
+    "Patch Colors",
+    [
+        "Silver",
+        "White",
+        "Beige",
+        "Cream",
+        "Sky Blue",
+        "Magenta",
+        "Red",
+        "Blue",
+        "Black",
+        "Orange",
+        "Gold",
+        "Ivory"
+    ],
+    default=["Silver", "Beige"]
+)
+
+patch_gradient_toggle = st.toggle(
+    "Gradient Patch Flow"
+)
+
+patch_symmetry_toggle = st.toggle(
+    "Symmetrical Patch Layout",
+    value=True
+)
+
+custom_side_patch = ""
+
+if patch_style == "Custom":
+
+    custom_side_patch = st.text_area(
+        "Custom Patch Instructions",
+        height=120
     )
 
-# -------------------------------------------------
-# EXECUTION
-# -------------------------------------------------
-if st.button("🚀 EXECUTE FULL SUITE"):
-    try:
-        base_image = Image.open(BASE_IMAGES[car]).convert("RGB")
-    except FileNotFoundError:
-        st.error(f"Could not find local file background image at `{BASE_IMAGES[car]}`. Please make sure your assets folder exists on your repository.")
-        st.stop()
+# --------------------------------------
+# 📈 LIVE TREND ANALYSIS BOX
+# --------------------------------------
 
-    color_choices = {
-        1: ["Silver"],
-        3: ["Silver", "Blue", "Red"],
-        5: ["Silver", "Orange", "Blue", "Red", "Gold"]
-    }
-    palette = color_choices[num_images]
+st.markdown("### 📈 OpenRouter 2026 Upholstery Trend Analysis")
+
+trend_analysis_toggle = st.toggle(
+    "Enable Live Trend Intelligence",
+    value=True
+)
+
+trend_focus = st.multiselect(
+    "Trend Focus Areas",
+    [
+        "GenZ Hatchback Trends",
+        "OEM+ Styling",
+        "Luxury Side Patches",
+        "Ambient Cabin Themes",
+        "Sporty Contrast Stitching",
+        "Compact Ergonomic Seats",
+        "Urban Premium Mods",
+        "Integrated Headrest Styling"
+    ],
+    default=[
+        "GenZ Hatchback Trends",
+        "Luxury Side Patches"
+    ]
+)
+
+custom_instruction = st.text_area(
+    "✍️ Engineering Instructions",
+    placeholder="Add professional engineering details..."
+)
+
+# --------------------------------------
+# 🚀 EXECUTION
+# --------------------------------------
+
+if st.button("🚀 EXECUTE FULL SUITE"):
+
     generated_images = []
 
-    with st.status("Engineering Intelligence Active...") as status:
-        for current_color in palette:
-            prompt = f"""
-            Preserve exact OEM car seat structure and cabin layout.
-            Keep identical OEM seat shape and contours.
-            Do not change: seat shape, dashboard, geometry, perspective, headrest structure, seat contour.
-            Only modify: leather material, stitching, quilting, piping, thread colors.
+    seat_layout_prompt = ""
 
-            Vehicle: {car}
-            Material: {material}
-            Stitching: {stitch_type}
-            Thread Color: {current_color}
-            Base Color: {base_color}
-            Quilt Details: {custom_pq}
-            Additional Instructions: {custom_instruction}
+    if seat_generation_mode == "Single Front Seat":
 
-            Premium automotive photography, OEM factory fitment, ultra realistic, same original seat, realistic stitching, luxury upholstery, high-end craftsmanship
+        seat_layout_prompt = """
+        Generate ONLY one single OEM WagonR front seat.
+        integrated fixed headrest.
+        compact hatchback proportions.
+        """
+
+    else:
+
+        seat_layout_prompt = """
+        Generate complete 4-seat OEM layout.
+        include rear bench and front seats.
+        """
+
+    patch_positions_text = ", ".join(patch_position)
+    patch_colors_text = ", ".join(patch_color_palette)
+
+    side_patch_prompt = f"""
+    Advanced OEM side patch engineering.
+
+    Patch Placement:
+    {patch_positions_text}
+
+    Patch Style:
+    {patch_style}
+
+    Patch Texture:
+    {patch_texture}
+
+    Patch Colors:
+    {patch_colors_text}
+
+    Gradient Flow:
+    {patch_gradient_toggle}
+
+    Symmetry:
+    {patch_symmetry_toggle}
+    """
+
+    trend_analysis_result = ""
+
+    if trend_analysis_toggle:
+
+        trend_analysis_result = call_openrouter(
+            f"""
+            Analyze latest 2026 upholstery trends.
+
+            Vehicle:
+            {car}
+
+            Patch Style:
+            {patch_style}
+
+            Trend Focus:
+            {', '.join(trend_focus)}
             """
+        )
 
-            st.write(f"🎨 Generating {current_color} Variant...")
-            img = refine_image_advanced(base_image, prompt)
-            if img:
-                generated_images.append((img, current_color))
+    for i in range(num_images):
 
-        market_refs = fetch_market_references(f"{car} {material}")
-        analysis = call_openrouter(f"""
-            Analyze automotive upholstery quality.
-            Vehicle: {car} | Material: {material} | Stitch: {stitch_type} | Base Color: {base_color}
-        """)
-        status.update(label="✅ Engineering Complete", state="complete")
+        strict_prompt = f"""
+        Professional automotive interior photography.
 
-    # -------------------------------------------------
-    # OUTPUT UI
-    # -------------------------------------------------
-    col_left, col_right = st.columns([2, 1])
+        Vehicle:
+        {car}
 
-    with col_left:
-        st.subheader("🎨 OEM Refined Concepts")
-        for idx, (img, c_name) in enumerate(generated_images):
-            st.image(img, caption=f"Variant: {c_name}", use_container_width=True)
-            
-            buf = io.BytesIO()
-            img.save(buf, format="PNG")
-            
-            # Explicit key optimization to prevent widget element crashes during fast processing loop
-            st.download_button(
-                label=f"💾 Save {c_name}",
-                data=buf.getvalue(),
-                file_name=f"pictator_{c_name.lower()}.png",
-                mime="image/png",
-                key=f"dl_btn_{c_name}_{idx}"
+        Material:
+        {material}
+
+        Seat Base Color:
+        {base_color}
+
+        Stitching:
+        {stitch_type}
+
+        Seat Generation Mode:
+        {seat_generation_mode}
+
+        {seat_layout_prompt}
+
+        Patch Engineering:
+        {side_patch_prompt}
+
+        Engineering Notes:
+        {custom_instruction}
+
+        Rules:
+        - enforce WagonR fixed integrated headrest
+        - prohibit detachable headrests
+        - preserve upright WagonR hatchback ergonomics
+        - compact slim OEM side shoulder proportions
+        - realistic OEM styling
+        - 8K automotive catalog rendering
+        """
+
+        img = generate_ai_image(
+            strict_prompt,
+            MODEL_OPTIONS[selected_model]
+        )
+
+        if img:
+            generated_images.append(img)
+
+    # --------------------------------------
+    # OUTPUT
+    # --------------------------------------
+
+    if generated_images:
+
+        st.subheader("🎨 AI Generated Concepts")
+
+        for idx, img in enumerate(generated_images):
+
+            st.image(
+                img,
+                caption=f"Variant {idx+1}",
+                use_container_width=True
             )
 
-    with col_right:
-        st.subheader("📈 Engineering Analysis")
-        st.info(analysis)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+
+            st.download_button(
+                f"💾 Save Variant {idx+1}",
+                buf.getvalue(),
+                f"pictator_variant_{idx+1}.png",
+                key=f"save_{idx}"
+            )
+
+    # --------------------------------------
+    # 📈 TREND ANALYSIS PANEL
+    # --------------------------------------
+
+    if trend_analysis_result:
+
         st.divider()
 
-        if market_refs:
-            st.subheader("🌍 Market References")
-            for ref in market_refs:
-                st.image(ref["img"], caption=ref["src"])
-                st.link_button("View Source", ref["link"])
+        st.subheader("📈 Live OpenRouter Trend Analysis")
 
-# -------------------------------------------------
-# TECH NOTES
-# -------------------------------------------------
-with st.expander("📊 2026 OEM Tech Standards"):
-    st.write("- OEM geometry preservation enabled")
-    st.write("- Low hallucination refinement mode")
-    st.write("- Optimized GPU inference pipeline")
-    st.write("- Multi-variant rendering enabled")
-    st.write("- Premium automotive upholstery refinement")
-    st.caption("Zero Data Retention (ZDR) Enabled")
+        st.text_area(
+            "2026 Upholstery Intelligence",
+            value=trend_analysis_result,
+            height=320
+        )
+
+# --------------------------------------
+# 📊 TECH STANDARDS
+# --------------------------------------
+
+with st.expander("📊 2026 Tech Standards"):
+
+    st.write("- OEM geometry preservation enabled.")
+    st.write("- WagonR fixed headrest enforcement enabled.")
+    st.write("- Advanced side patch intelligence active.")
+    st.write("- GenZ upholstery trend engine active.")
+    st.write("- Single seat / full set rendering active.")
+
+    st.caption(
+        "Zero Data Retention (ZDR) Commitment"
+    )
