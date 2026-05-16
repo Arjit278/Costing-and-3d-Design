@@ -92,14 +92,13 @@ if not st.session_state.authenticated:
 MODEL_OPTIONS = {
     "⚡ FLUX.1 Schnell": "black-forest-labs/FLUX.1-schnell",
     "🔥 FLUX.1 Dev": "black-forest-labs/FLUX.1-dev",
-    "⚡ PaliGemma 2 3B": "google/paligemma2-3b-pt-448",
-    "✨ Pixtral 12B": "mistralai/Pixtral-12B-2409",
-    "🔥 GLM-4.1V 9B Thinking": "THUDM/glm-4-9b-chat",
-    "🏎️ Qwen2.5-VL 7B Instruct": "Qwen/Qwen2.5-VL-7B-Instruct",
-    "🏎️ FLUX.2 Klein": "black-forest-labs/FLUX.2-klein-9b-fp8",
-    "✨ FLUX.1 Kontext Dev": "black-forest-labs/FLUX.1-Kontext-dev",
+    "⚡ FLUX.2 Dev": "black-forest-labs/FLUX.2-dev",
+    "✨ FLUX.2-klein-4B": "black-forest-labs/FLUX.2-klein-4B",
+    "🔥 Qwen-Image-Edit-2511-Lightning": "lightx2v/Qwen-Image-Edit-2511-Lightning",
+    "🏎️ Z-Image-Turbo": "Tongyi-MAI/Z-Image-Turbo",
+    "✨ Stable-diffusion-xl-base-1.0": "stabilityai/stable-diffusion-xl-base-1.0",
     "🪟 FLUX.1 Fill Dev": "black-forest-labs/FLUX.1-Fill-dev",
-    "🌀 FLUX.1 Redux Dev": "black-forest-labs/FLUX.1-Redux-dev"
+    "🌀 Stable-diffusion-v1-5"": "sd-legacy/stable-diffusion-v1-5"
 }
 
 selected_model = st.sidebar.selectbox(
